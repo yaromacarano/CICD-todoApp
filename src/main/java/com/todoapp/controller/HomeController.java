@@ -6,11 +6,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import jakarta.servlet.http.HttpServletRequest; /** * Home controller * Equivalent to HomeController.cs in the original ASP.NET Core application */
-@Controller
+import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/")
 public class HomeController {
-  private static final Logger logger =
+  private static final Logger =
       LoggerFactory.getLogger(HomeController.class);
   @GetMapping("/")
   public String index() {
