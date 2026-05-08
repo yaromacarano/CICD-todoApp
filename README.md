@@ -98,7 +98,7 @@ Screenshots are stored in `docs/screenshots/` and cover the main proof points of
 - running ECS task;
 - application running from the ECS deployment endpoint.
 
-Screenshot naming and content are documented in `docs/screenshots/README.md`.
+Screenshot naming and content are documented in `docs/screenshots/`.
 
 ## Documentation
 
@@ -110,7 +110,7 @@ Detailed notes are kept in the `docs/` directory:
 - `docs/04-jenkins-pipeline.md` — Jenkins stages, tools, integrations, and environment values.
 - `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
 - `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, Jenkins, SonarQube, ECR, and ECS.
-- `docs/screenshots/README.md` — screenshot list used as visual proof of pipeline and deployment results.
+- `docs/screenshots/` — screenshot list used as visual proof of pipeline and deployment results.
 
 ## Security
 
