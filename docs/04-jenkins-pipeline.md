@@ -20,6 +20,28 @@ The pipeline uses these Jenkins tool names:
 
 The tool names in Jenkins must match the values used in `Jenkinsfile`.
 
+
+## Jenkins plugins
+
+The Jenkins pipeline requires plugins for Pipeline syntax, GitHub checkout, Maven integration, SonarQube analysis, Docker image build/push, AWS authentication and ECS deployment commands.
+
+Installed plugins for this setup:
+
+- **Pipeline** — core Pipeline functionality for running the `Jenkinsfile`.
+- **Pipeline Maven Integration Plugin** — Maven build support inside Jenkins Pipeline.
+- **GitHub Branch Source Plugin** — GitHub repository and branch integration.
+- **Pipeline: GitHub Groovy Libraries** — GitHub-based shared library support for Pipeline jobs.
+- **SonarQube Scanner for Jenkins** — SonarQube scanner configuration and Quality Gate integration.
+- **Amazon ECR plugin** — AWS ECR authentication support for Docker image push.
+- **Pipeline: AWS Steps** — AWS-related Pipeline steps and credential handling.
+- **Amazon Web Services SDK :: All** — AWS SDK dependencies used by AWS-related Jenkins plugins.
+- **Docker Pipeline** — Docker commands and image operations inside Jenkins Pipeline.
+- **CloudBees Docker Build and Publish plugin** — Docker image build and publish support.
+- **Build Timestamp Plugin** — build timestamp variables for logs and build metadata.
+- **Workspace Cleanup Plugin** — workspace cleanup before or after pipeline runs.
+
+These plugins support the current pipeline stages from GitHub checkout to Docker image delivery and AWS ECS deployment trigger.
+
 ## Jenkins integrations
 
 - **SonarQube server:** `sonarserver`
