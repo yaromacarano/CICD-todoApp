@@ -12,6 +12,8 @@ pipeline {
         vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"
         service = "todo-ecs-service"
         cluster = "newcluster"
+	taskDefinition = "todo-task"
+	containerName = "todo"
     }
   stages {
    
@@ -93,13 +95,34 @@ pipeline {
           }
         }
 
-         stage('Deploy to ecs') {
-          steps {
+         stage('Deploy to ECS') {
+           steps {
             withAWS(credentials: 'awscreds', region: 'us-east-1') {
-            sh "aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment"
-               }
-          }
+            sh '''
+                IMAGE_URI="${imageName}:${BUILD_NUMBER}"
+
+                sed "s|IMAGE_URI_PLACEHOLDER|$IMAGE_URI|g" aws/task-definition-template.json > task-definition.json
+
+                NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+                    --cli-input-json file://task-definition.json \
+                    --query 'taskDefinition.taskDefinitionArn' \
+                    --output text)
+
+                aws ecs update-service \
+                    --cluster ${cluster} \
+                    --service ${service} \
+                    --task-definition $NEW_TASK_DEF_ARN
+
+                aws ecs wait services-stable \
+                    --cluster ${cluster} \
+                    --services ${service}
+
+                echo "Deployed image: $IMAGE_URI"
+                echo "Task definition: $NEW_TASK_DEF_ARN"
+            '''
+           }
         }
+     }
 
 
   }
