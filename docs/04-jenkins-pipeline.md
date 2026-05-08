@@ -1,0 +1,126 @@
+# Jenkins Pipeline
+
+## Purpose
+
+This document explains the CI/CD pipeline defined in `Jenkinsfile`.
+
+The pipeline automates the flow from source code checkout to AWS ECS deployment trigger.
+
+## Pipeline overview
+
+Fetch code → Maven verification → Checkstyle analysis → SonarQube analysis → Quality Gate → Maven package → Docker image build → Docker image push to ECR → ECS service deployment trigger
+
+## Jenkins tools
+
+The pipeline uses these Jenkins tool names:
+
+- **JDK:** `JDK17`
+- **Maven:** `MAVEN3.9`
+- **SonarQube scanner:** `sonar8.0`
+
+The tool names in Jenkins must match the values used in `Jenkinsfile`.
+
+## Jenkins integrations
+
+- **SonarQube server:** `sonarserver`
+- **AWS credentials ID:** `awscreds`
+- **Docker registry credentials:** configured for AWS ECR push
+- **Docker CLI:** available on the Jenkins agent
+- **AWS CLI:** available on the Jenkins agent
+
+## Repository checkout
+
+The `Fetch code` stage clones the repository from GitHub.
+
+Current repository URL:
+
+- `git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'`
+
+## Environment values
+
+The pipeline uses these AWS and deployment values from the `environment` block:
+
+- `region = "us-east-1"`
+- `accountId = "551647579168"`
+- `ecrRepository = "todo-appimg"`
+- `imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"`
+- `vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `service = "todo-ecs-service"`
+- `cluster = "newcluster"`
+
+## Pipeline stages
+
+### 1. Fetch code
+
+Clones the source code from GitHub.
+
+This stage confirms that Jenkins can access the repository and branch.
+
+### 2. UNIT TEST
+
+Runs Maven verification:
+
+- `mvn clean verify`
+
+This stage checks that the project can be compiled and verified through Maven.
+
+### 3. Checkstyle Analysis
+
+Runs Checkstyle analysis through Maven.
+
+The stage produces a style/static analysis report for the Java codebase.
+
+### 4. Sonar Code Analysis
+
+Runs SonarQube analysis with the configured SonarQube scanner and server.
+
+This stage sends code quality data to SonarQube.
+
+### 5. Quality Gate
+
+Waits for the SonarQube Quality Gate result.
+
+The pipeline continues only after the quality gate result is received.
+
+### 6. Build
+
+Builds the application artifact:
+
+- `mvn clean package`
+
+Application artifact:
+
+- `target/todolist-app-1.0.0.jar`
+
+### 7. Build App Image
+
+Builds the Docker image using the repository `Dockerfile`.
+
+The image is prepared for upload to AWS ECR.
+
+### 8. Upload App Image
+
+Authenticates to AWS ECR and pushes the Docker image.
+
+This stage confirms that Jenkins has valid AWS and Docker registry access.
+
+### 9. Deploy to ECS
+
+Triggers a new deployment of the configured ECS service:
+
+- `aws ecs update-service --cluster newcluster --service todo-ecs-service --force-new-deployment --region us-east-1`
+
+This makes ECS start a new deployment cycle for the service.
+
+## Successful pipeline result
+
+A successful pipeline run confirms that:
+
+- Jenkins can clone the repository;
+- Maven verification passes;
+- static analysis stages run;
+- SonarQube Quality Gate is checked;
+- the application JAR is built;
+- Docker image build succeeds;
+- the image is pushed to AWS ECR;
+- AWS ECS deployment is triggered.

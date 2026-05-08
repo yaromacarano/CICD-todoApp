@@ -17,7 +17,7 @@ pipeline {
    
         stage('Fetch code') {
             steps {
-               git branch: 'main', url: 'https://github.com/yaromacarano/TodoListApp-Java-SpringBoot.git'
+               git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'
             }
 
         }
