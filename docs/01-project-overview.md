@@ -63,7 +63,7 @@ The project follows a simple CI/CD architecture:
 - `Dockerfile` — defines how the application image is built.
 - `pom.xml` — defines Maven build, dependencies, and plugins.
 - `docs/` — contains technical documentation for the project.
-- `docs/screenshots/` — stores visual proof of pipeline and deployment results.
+- `docs/screenshots/v1.1-ecs-task-revision-deployment` — stores visual proof of pipeline and deployment results.
 - `aws/task-definition-template.json` — ECS task definition template used for deployment revision creation
 
 ## Portfolio value

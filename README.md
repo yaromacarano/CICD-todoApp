@@ -41,7 +41,7 @@ The pipeline performs these steps:
 - `README.md` — main project overview
 - `docs/` — technical documentation
 - `aws/` — AWS deployment templates
-- `aws/task-definition-template.json` — ECS task definition template used by Jenkins during
+- `aws/task-definition-template.json` — ECS task definition template used by Jenkins during deployment
 - `docs/screenshots/` — screenshots used as visual proof of the pipeline and deployment result
 
 ## Run locally
@@ -98,10 +98,10 @@ Screenshots are stored in `docs/screenshots/` and cover the main proof points of
 - Docker image in AWS ECR;
 - AWS ECS service deployment;
 - running ECS task;
-- application running from the ECS deployment endpoint.
-- new ECS task definition revision after deployment
+- application running from the ECS deployment endpoint;
+- new ECS task definition revision after deployment.
 
-Screenshot naming and content are documented in `docs/screenshots/`.
+Screenshot naming and content are documented in `docs/screenshots/v1.1-ecs-task-revision-deployment`.
 
 ## Documentation
 
@@ -113,7 +113,7 @@ Detailed notes are kept in the `docs/` directory:
 - `docs/04-jenkins-pipeline.md` — Jenkins stages, tools, integrations, and environment values.
 - `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
 - `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, Jenkins, SonarQube, ECR, and ECS.
-- `docs/screenshots/` — screenshot list used as visual proof of pipeline and deployment results.
+- `docs/screenshots/v1.1-ecs-task-revision-deployment` — screenshot list used as visual proof of pipeline and deployment results.
 
 ## Security
 

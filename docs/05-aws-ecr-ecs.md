@@ -88,8 +88,6 @@ The Jenkins IAM user or role uses access to these AWS API areas:
 - `ecs:DescribeClusters`
 - `ecs:RegisterTaskDefinition`
 - `ecs:DescribeTaskDefinition`
-- `ecs:UpdateService`
-- `ecs:DescribeServices`
 - `iam:PassRole`
 
 ## Deployment verification
