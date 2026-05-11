@@ -1,6 +1,6 @@
 # CI/CD Todo App — DevOps Portfolio Project
 
-Java Spring Boot Todo application with a Jenkins CI/CD pipeline, Docker image build, SonarQube quality checks, AWS ECR image publishing, and AWS ECS deployment trigger.
+Java Spring Boot Todo application with a Jenkins CI/CD pipeline, Docker image build, SonarQube quality checks, AWS ECR image publishing, and AWS ECS task definition revision deployment.
 
 The application code is used as a base for demonstrating a practical DevOps workflow around build automation, containerization, quality control, and cloud deployment.
 
@@ -18,7 +18,7 @@ The pipeline performs these steps:
 6. Package the Spring Boot application.
 7. Build a Docker image.
 8. Push the image to AWS ECR.
-9. Trigger a new AWS ECS service deployment.
+9. Register a new ECS task definition revision and update the ECS service
 
 ## Tech stack
 
@@ -40,6 +40,8 @@ The pipeline performs these steps:
 - `.gitignore` — ignored local and build files
 - `README.md` — main project overview
 - `docs/` — technical documentation
+- `aws/` — AWS deployment templates
+- `aws/task-definition-template.json` — ECS task definition template used by Jenkins during
 - `docs/screenshots/` — screenshots used as visual proof of the pipeline and deployment result
 
 ## Run locally
@@ -97,6 +99,7 @@ Screenshots are stored in `docs/screenshots/` and cover the main proof points of
 - AWS ECS service deployment;
 - running ECS task;
 - application running from the ECS deployment endpoint.
+- new ECS task definition revision after deployment
 
 Screenshot naming and content are documented in `docs/screenshots/`.
 

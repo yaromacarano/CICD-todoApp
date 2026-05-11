@@ -159,20 +159,31 @@ Common causes:
 - ECR repository does not exist;
 - Docker is not authenticated to ECR.
 
-## ECS deployment trigger fails
-
-Current deployment command:
-
-- `aws ecs update-service --cluster newcluster --service todo-ecs-service --force-new-deployment --region us-east-1`
+## ECS deployment fails
 
 Check:
 
 - ECS cluster exists;
 - ECS service exists;
-- Jenkins has `ecs:UpdateService` permission;
+- task definition template exists: `aws/task-definition-template.json`;
 - AWS region is correct;
-- ECS task definition points to the correct ECR image;
-- ECS service has valid networking configuration.
+- placeholder exists: `IMAGE_URI_PLACEHOLDER`;
+- Jenkins credential exists: ecr-image-name;
+- Jenkins has ecs:RegisterTaskDefinition;
+- Jenkins has ecs:UpdateService;
+- Jenkins has iam:PassRole;
+- ECS service networking is valid.
+
+## Task definition registration fails
+
+Common causes:
+
+- invalid JSON in `aws/task-definition-template.json`;
+- empty tags array;
+- missing iam:PassRole;
+- wrong execution role ARN;
+- invalid image URI;
+- missing ECR image tag.
 
 ## ECS task does not stay running
 

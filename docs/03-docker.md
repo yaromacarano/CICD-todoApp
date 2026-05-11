@@ -69,9 +69,9 @@ The Jenkins pipeline builds and publishes the image in two stages:
 
 The current image name in `Jenkinsfile` points to AWS ECR:
 
-- `imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"`
+- `imageName` is loaded from Jenkins credential ecr-image-name
 
-The image is tagged and pushed during the pipeline execution.
+Docker image is tagged with the Jenkins `BUILD_NUMBER`
 
 ## Docker checks
 

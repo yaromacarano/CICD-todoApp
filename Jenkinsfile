@@ -8,15 +8,15 @@ pipeline {
 
     environment {
         registryCredential = "ecr:us-east-1:awscreds"
-        imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"
-        vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"
+        imageName = credentials('ecr-image-name')
+        Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"
         service = "todo-ecs-service"
         cluster = "newcluster"
-	taskDefinition = "todo-task"
-	containerName = "todo"
+        taskDefinition = "todo-task"
+        containerName = "todo"
     }
   stages {
-   
+
         stage('Fetch code') {
             steps {
                git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'
@@ -76,18 +76,18 @@ pipeline {
 
         stage('Build App Image') {
           steps {
-       
+
             script {
                 dockerImage = docker.build( imageName + ":$BUILD_NUMBER", "./")
                 }
           }
-    
+
         }
 
         stage('Upload App Image') {
           steps{
             script {
-              docker.withRegistry( vprofileRegistry, registryCredential ) {
+              docker.withRegistry( Registry, registryCredential ) {
                 dockerImage.push("$BUILD_NUMBER")
                 dockerImage.push('latest')
               }

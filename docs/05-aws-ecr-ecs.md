@@ -14,7 +14,7 @@ AWS ECR stores the Docker image built by Jenkins. AWS ECS runs the containerized
 
 ## Deployment flow
 
-Jenkins builds the Docker image, authenticates to AWS ECR, pushes the image, and triggers a forced ECS service deployment.
+Jenkins builds the Docker image, authenticates to AWS ECR, pushes the image, creates a new ECS task definition revision from aws/task-definition-template.json, updates the ECS service to use the new revision and waits until the ECS service becomes stable.
 
 The ECS service then starts a new deployment cycle and runs a task with the configured task definition.
 
@@ -22,11 +22,11 @@ The ECS service then starts a new deployment cycle and runs a task with the conf
 
 The pipeline uses this image name:
 
-- `imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"`
+- `imageName` is stored in Jenkins credential `ecr-image-name`.
 
 Registry value:
 
-- `vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
 
 AWS region:
 
@@ -38,10 +38,14 @@ The pipeline triggers deployment for this ECS service:
 
 - `cluster = "newcluster"`
 - `service = "todo-ecs-service"`
+- `taskDefinition = "todo-task"`
+- `containerName = "todo"`
 
-Deployment command:
+## ECS task definition template
 
-- `aws ecs update-service --cluster newcluster --service todo-ecs-service --force-new-deployment --region us-east-1`
+- template path: `aws/task-definition-template.json`
+- image placeholder: `IMAGE_URI_PLACEHOLDER`
+- generated file during pipeline: `task-definition.json`
 
 ## AWS resources
 
@@ -82,6 +86,11 @@ The Jenkins IAM user or role uses access to these AWS API areas:
 - `ecs:UpdateService`
 - `ecs:DescribeServices`
 - `ecs:DescribeClusters`
+- `ecs:RegisterTaskDefinition`
+- `ecs:DescribeTaskDefinition`
+- `ecs:UpdateService`
+- `ecs:DescribeServices`
+- `iam:PassRole`
 
 ## Deployment verification
 

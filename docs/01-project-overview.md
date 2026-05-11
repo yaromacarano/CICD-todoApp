@@ -20,7 +20,7 @@ The workflow covers:
 6. Maven package build.
 7. Docker image build.
 8. Image push to AWS ECR.
-9. ECS service deployment trigger.
+9. ECS task definition revision deployment.
 
 ## Main components
 
@@ -55,7 +55,7 @@ The project follows a simple CI/CD architecture:
 3. Jenkins builds, verifies, scans, and packages the application.
 4. Jenkins builds a Docker image.
 5. Jenkins pushes the image to AWS ECR.
-6. AWS ECS pulls the image and starts a new service deployment cycle.
+6. Jenkins creates a new ECS task definition revision and updates the ECS service to use it.
 
 ## Repository files related to DevOps
 
@@ -64,6 +64,7 @@ The project follows a simple CI/CD architecture:
 - `pom.xml` — defines Maven build, dependencies, and plugins.
 - `docs/` — contains technical documentation for the project.
 - `docs/screenshots/` — stores visual proof of pipeline and deployment results.
+- `aws/task-definition-template.json` — ECS task definition template used for deployment revision creation
 
 ## Portfolio value
 

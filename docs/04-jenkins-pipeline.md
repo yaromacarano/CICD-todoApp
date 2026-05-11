@@ -62,12 +62,12 @@ Current repository URL:
 
 The pipeline uses these AWS and deployment values from the `environment` block:
 
-- `region = "us-east-1"`
-- `accountId = "551647579168"`
-- `ecrRepository = "todo-appimg"`
-- `imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"`
-- `vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `registryCredential = "ecr:us-east-1:awscreds"`
+- `imageName = credentials('ecr-image-name')`
+- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
 - `service = "todo-ecs-service"`
+- `taskDefinition = "todo-task"`
+- `containerName = "todo"`
 - `cluster = "newcluster"`
 
 ## Pipeline stages
@@ -130,7 +130,12 @@ This stage confirms that Jenkins has valid AWS and Docker registry access.
 
 Triggers a new deployment of the configured ECS service:
 
-- `aws ecs update-service --cluster newcluster --service todo-ecs-service --force-new-deployment --region us-east-1`
+- Jenkins builds `IMAGE_URI` from imageName and `BUILD_NUMBER`;
+- Jenkins replaces `IMAGE_URI_PLACEHOLDER` in aws/task-definition-template.json;
+- Jenkins creates task-definition.json;
+- Jenkins registers a new ECS task definition revision;
+- Jenkins updates ECS service to the new revision;
+- Jenkins waits until ECS service is stable.
 
 This makes ECS start a new deployment cycle for the service.
 
@@ -145,4 +150,6 @@ A successful pipeline run confirms that:
 - the application JAR is built;
 - Docker image build succeeds;
 - the image is pushed to AWS ECR;
-- AWS ECS deployment is triggered.
+- ECS task definition revision registration;
+- ECS service update;
+- ECS service stability check.
