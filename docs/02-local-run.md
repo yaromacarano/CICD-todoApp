@@ -4,7 +4,7 @@
 
 This document describes how to build and run the application on a local machine.
 
-Local execution is useful for checking the application before running the Jenkins pipeline or building the Docker image.
+Local execution checks the application before running the GitHub Actions workflow or building the Docker image.
 
 ## Prerequisites
 
@@ -20,6 +20,17 @@ Run these commands:
 
 - `git clone https://github.com/yaromacarano/CICD-todoApp.git`
 - `cd CICD-todoApp`
+- `git checkout github-actions`
+
+## Local data directory
+
+The application expects a data/ directory in the project root during local execution.
+
+The repository keeps this directory with:
+
+- `data/.gitkeep`
+
+This makes local runs work from the repository root without creating the directory manually.
 
 ## Check Java
 
@@ -64,7 +75,11 @@ The build artifact is created in:
 
 - `target/`
 
-The Jenkins pipeline uses this artifact name:
+The workflow uploads this artifact from:
+
+- `target/*.jar`
+
+The application artifact used in this project is:
 
 - `target/todolist-app-1.0.0.jar`
 

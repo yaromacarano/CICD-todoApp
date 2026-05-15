@@ -2,80 +2,106 @@
 
 ## Purpose
 
-This document describes the AWS part of the CI/CD workflow.
+This document describes the AWS part of the GitHub Actions CI/CD workflow.
 
-AWS ECR stores the Docker image built by Jenkins. AWS ECS runs the containerized application through an ECS service.
+AWS ECR stores the Docker image built by GitHub Actions. AWS ECS runs the containerized application through an ECS service.
 
 ## AWS services used
 
 - **AWS ECR:** stores the Docker image.
 - **AWS ECS:** runs the application container.
-- **IAM:** provides permissions for Jenkins to access AWS resources.
+- **AWS IAM:** provides permissions for GitHub Actions to access AWS resources.
+- **AWS CloudWatch Logs:** stores logs from the ECS task.
 
 ## Deployment flow
 
-Jenkins builds the Docker image, authenticates to AWS ECR, pushes the image, creates a new ECS task definition revision from aws/task-definition-template.json, updates the ECS service to use the new revision and waits until the ECS service becomes stable.
+GitHub Actions builds the Docker image, authenticates to AWS ECR, pushes the image, renders a new ECS task definition, and deploys it to the ECS service.
 
-The ECS service then starts a new deployment cycle and runs a task with the configured task definition.
+Deployment flow:
+
+1. GitHub Actions configures AWS credentials.
+2. The workflow logs in to AWS ECR.
+3. The Docker image is built from the repository `Dockerfile`.
+4. The image is tagged with the GitHub Actions run number.
+5. The image is pushed to AWS ECR.
+6. The workflow renders `aws/task-definition-template.json` with the new image.
+7. AWS ECS receives a new task definition revision.
+8. The ECS service is updated to use the new task definition.
+9. The workflow waits until the ECS service becomes stable.
 
 ## ECR configuration
 
-The pipeline uses this image name:
+The ECR repository name is stored in GitHub Actions Variable:
 
-- `imageName` is stored in Jenkins credential `ecr-image-name`.
+- `ECR_REPOSITORY`
 
-Registry value:
+The AWS region is stored in GitHub Actions Variable:
 
-- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `AWS_REGION`
 
-AWS region:
+The final image URI is created during the workflow from:
 
-- `region = "us-east-1"`
+- ECR registry returned by the ECR login action;
+- ECR repository variable;
+- GitHub Actions run number.
+
+Image format:
+
+- `ECR_REGISTRY/ECR_REPOSITORY:github.run_number`
 
 ## ECS configuration
 
-The pipeline triggers deployment for this ECS service:
+The workflow deploys to ECS using these GitHub Actions Variables:
 
-- `cluster = "newcluster"`
-- `service = "todo-ecs-service"`
-- `taskDefinition = "todo-task"`
-- `containerName = "todo"`
+- `CLUSTER` — ECS cluster name.
+- `SERVICE` — ECS service name.
+- `CONTAINER_NAME` — container name inside the ECS task definition.
+
+The ECS task definition template is stored in:
+
+- `aws/task-definition-template.json`
 
 ## ECS task definition template
 
-- template path: `aws/task-definition-template.json`
-- image placeholder: `IMAGE_URI_PLACEHOLDER`
-- generated file during pipeline: `task-definition.json`
+The task definition template contains the runtime configuration for the ECS task:
+
+- task family;
+- container name;
+- container port mapping;
+- CPU and memory;
+- Fargate compatibility;
+- CloudWatch logs configuration;
+- ECS execution role;
+- container image field.
+
+During deployment, GitHub Actions renders the template and replaces the container image with the new ECR image.
 
 ## AWS resources
 
 The AWS environment contains:
 
-- ECR repository: `todo-appimg`;
-- ECS cluster: `newcluster`;
-- ECS service: `todo-ecs-service`;
-- ECS task definition configured with the ECR image;
+- ECR repository for the application image;
+- ECS cluster;
+- ECS service;
+- ECS task definition configured for Fargate;
 - networking configuration required by the ECS service;
-- IAM permissions for Jenkins.
+- IAM permissions for GitHub Actions;
+- CloudWatch log group for ECS task logs.
 
-## Jenkins AWS access
+## GitHub Actions AWS access
 
-Jenkins uses AWS credentials stored in Jenkins Credentials.
+GitHub Actions uses AWS credentials stored in GitHub Actions Secrets.
 
-Credential ID used by the pipeline:
+Required secrets:
 
-- `awscreds`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
 
-The Jenkins credentials include permissions for:
-
-- ECR authentication;
-- ECR image push;
-- ECS service update;
-- ECS service and cluster description if required by the environment.
+The workflow does not store AWS access keys in the repository.
 
 ## IAM permission areas
 
-The Jenkins IAM user or role uses access to these AWS API areas:
+The AWS IAM user or role used by GitHub Actions needs access to these AWS API areas:
 
 - `ecr:GetAuthorizationToken`
 - `ecr:BatchCheckLayerAvailability`
@@ -83,25 +109,29 @@ The Jenkins IAM user or role uses access to these AWS API areas:
 - `ecr:UploadLayerPart`
 - `ecr:CompleteLayerUpload`
 - `ecr:PutImage`
-- `ecs:UpdateService`
-- `ecs:DescribeServices`
-- `ecs:DescribeClusters`
 - `ecs:RegisterTaskDefinition`
 - `ecs:DescribeTaskDefinition`
+- `ecs:UpdateService`
+- `ecs:DescribeServices`
 - `iam:PassRole`
+
+`iam:PassRole` is required because ECS task definitions use an execution role.
 
 ## Deployment verification
 
-After a successful Jenkins run, the AWS console shows:
+After a successful GitHub Actions run, the AWS console shows:
 
-- a new or updated image in ECR;
+- a new image in ECR with the GitHub Actions run number tag;
+- a new ECS task definition revision;
 - ECS service deployment activity;
 - running ECS task;
-- task definition using the ECR image;
+- ECS service using the latest task definition revision;
 - application available through the configured ECS endpoint or load balancer.
 
 ## Security notes
 
 AWS credentials are not stored in the repository.
 
-Sensitive values such as access keys, secret keys, tokens, and passwords are managed outside the repository through Jenkins Credentials and AWS IAM.
+Sensitive values such as access keys, secret keys, tokens, and passwords are managed outside the repository through GitHub Actions Secrets and AWS IAM.
+
+Screenshots must not expose AWS access keys, secret values, tokens, or private infrastructure details.

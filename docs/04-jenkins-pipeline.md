@@ -20,28 +20,6 @@ The pipeline uses these Jenkins tool names:
 
 The tool names in Jenkins must match the values used in `Jenkinsfile`.
 
-
-## Jenkins plugins
-
-The Jenkins pipeline requires plugins for Pipeline syntax, GitHub checkout, Maven integration, SonarQube analysis, Docker image build/push, AWS authentication and ECS deployment commands.
-
-Installed plugins for this setup:
-
-- **Pipeline** — core Pipeline functionality for running the `Jenkinsfile`.
-- **Pipeline Maven Integration Plugin** — Maven build support inside Jenkins Pipeline.
-- **GitHub Branch Source Plugin** — GitHub repository and branch integration.
-- **Pipeline: GitHub Groovy Libraries** — GitHub-based shared library support for Pipeline jobs.
-- **SonarQube Scanner for Jenkins** — SonarQube scanner configuration and Quality Gate integration.
-- **Amazon ECR plugin** — AWS ECR authentication support for Docker image push.
-- **Pipeline: AWS Steps** — AWS-related Pipeline steps and credential handling.
-- **Amazon Web Services SDK :: All** — AWS SDK dependencies used by AWS-related Jenkins plugins.
-- **Docker Pipeline** — Docker commands and image operations inside Jenkins Pipeline.
-- **CloudBees Docker Build and Publish plugin** — Docker image build and publish support.
-- **Build Timestamp Plugin** — build timestamp variables for logs and build metadata.
-- **Workspace Cleanup Plugin** — workspace cleanup before or after pipeline runs.
-
-These plugins support the current pipeline stages from GitHub checkout to Docker image delivery and AWS ECS deployment trigger.
-
 ## Jenkins integrations
 
 - **SonarQube server:** `sonarserver`
@@ -62,12 +40,12 @@ Current repository URL:
 
 The pipeline uses these AWS and deployment values from the `environment` block:
 
-- `registryCredential = "ecr:us-east-1:awscreds"`
-- `imageName = credentials('ecr-image-name')`
-- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `region = "us-east-1"`
+- `accountId = "551647579168"`
+- `ecrRepository = "todo-appimg"`
+- `imageName = "551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-appimg"`
+- `vprofileRegistry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
 - `service = "todo-ecs-service"`
-- `taskDefinition = "todo-task"`
-- `containerName = "todo"`
 - `cluster = "newcluster"`
 
 ## Pipeline stages
@@ -130,12 +108,7 @@ This stage confirms that Jenkins has valid AWS and Docker registry access.
 
 Triggers a new deployment of the configured ECS service:
 
-- Jenkins builds `IMAGE_URI` from imageName and `BUILD_NUMBER`;
-- Jenkins replaces `IMAGE_URI_PLACEHOLDER` in aws/task-definition-template.json;
-- Jenkins creates task-definition.json;
-- Jenkins registers a new ECS task definition revision;
-- Jenkins updates ECS service to the new revision;
-- Jenkins waits until ECS service is stable.
+- `aws ecs update-service --cluster newcluster --service todo-ecs-service --force-new-deployment --region us-east-1`
 
 This makes ECS start a new deployment cycle for the service.
 
@@ -150,6 +123,4 @@ A successful pipeline run confirms that:
 - the application JAR is built;
 - Docker image build succeeds;
 - the image is pushed to AWS ECR;
-- ECS task definition revision registration;
-- ECS service update;
-- ECS service stability check.
+- AWS ECS deployment is triggered.

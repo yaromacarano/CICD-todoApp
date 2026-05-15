@@ -4,13 +4,17 @@
 
 This document describes how the application is packaged and run as a Docker container.
 
-Docker is used to create a consistent runtime image for the Spring Boot application. The same image format is used by the Jenkins pipeline before publishing to AWS ECR.
+Docker is used to create a consistent runtime image for the Spring Boot application. The same image format is built by GitHub Actions before publishing to AWS ECR.
 
 ## Dockerfile role
 
 The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 17.
 
 The image build uses the JAR file from the `target/` directory.
+
+The Docker image creates the required data/ directory during image build.
+
+The data/.gitkeep file is only used for local execution from the repository root. Docker and ECS use the directory created inside the image.
 
 ## Build application artifact
 
@@ -26,7 +30,7 @@ Expected artifact:
 
 Command:
 
-- `docker build -t todo-app:v1.0 .`
+- `docker build -t todo-app:github-actions .`
 
 ## Check image
 
@@ -38,7 +42,7 @@ Command:
 
 Command:
 
-- `docker run --rm -p 8080:8080 todo-app:v1.0`
+- `docker run --rm -p 8080:8080 todo-app:github-actions`
 
 Application URL:
 
@@ -58,20 +62,29 @@ If the container is running in detached mode:
 
 - `docker stop <container_id>`
 
-## Docker image flow in Jenkins
+## Docker image flow in GitHub Actions
 
-The Jenkins pipeline builds and publishes the image in two stages:
+The GitHub Actions workflow builds and publishes the image after the Maven and SonarQube stages pass.
 
-- **Build App Image:** builds the Docker image from the repository Dockerfile.
-- **Upload App Image:** pushes the image to AWS ECR.
+Image flow:
+
+- GitHub Actions logs in to AWS ECR.
+- The workflow builds the Docker image from the repository `Dockerfile`.
+- The image is tagged with the GitHub Actions run number.
+- The image is pushed to AWS ECR.
+- The pushed image is used in the ECS task definition deployment.
 
 ## Image naming
 
-The current image name in `Jenkinsfile` points to AWS ECR:
+The workflow builds the image using these values:
 
-- `imageName` is loaded from Jenkins credential ecr-image-name
+- `ECR_REGISTRY` — returned by the AWS ECR login action.
+- `ECR_REPOSITORY` — loaded from GitHub Actions Variable `ECR_REPOSITORY`.
+- `IMAGE_TAG` — GitHub Actions run number from `github.run_number`.
 
-Docker image is tagged with the Jenkins `BUILD_NUMBER`
+Final image format:
+
+- `ECR_REGISTRY/ECR_REPOSITORY:IMAGE_TAG`
 
 ## Docker checks
 
@@ -79,4 +92,5 @@ A successful Docker setup confirms that:
 
 - the application can be packaged into a runtime image;
 - the container exposes the application port;
-- the image can be used by AWS ECS after being pushed to ECR.
+- the image can be pushed to AWS ECR;
+- the image can be used by AWS ECS after the task definition is rendered.

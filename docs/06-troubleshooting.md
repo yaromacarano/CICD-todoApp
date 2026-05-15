@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document contains checks for common issues in the local build, Docker image build, Jenkins pipeline, SonarQube analysis, AWS ECR push, and AWS ECS deployment trigger.
+This document contains checks for common issues in the local build, Docker image build, GitHub Actions workflow, SonarQube analysis, AWS ECR push, and AWS ECS deployment.
 
 ## Maven build fails
 
@@ -44,7 +44,7 @@ Application artifact:
 
 ## Docker image build fails
 
-### Check Docker
+### Check Docker locally
 
 Command:
 
@@ -58,7 +58,7 @@ Confirm that the JAR referenced by the `Dockerfile` exists in `target/`.
 
 Command:
 
-- `docker build -t todo-app:v1.0 .`
+- `docker build -t todo-app:github-actions .`
 
 ## Container starts but application is not available
 
@@ -78,112 +78,166 @@ Command:
 
 The application runs on port `8080`:
 
-- `docker run --rm -p 8080:8080 todo-app:v1.0`
+- `docker run --rm -p 8080:8080 todo-app:github-actions`
 
-## Jenkins cannot find Java or Maven
+## GitHub Actions workflow does not start
 
-Check Jenkins Global Tool Configuration.
+Check workflow triggers in `.github/workflows/deploy.yml`.
 
-Expected tool names:
+Expected triggers:
 
-- `JDK17`
-- `MAVEN3.9`
-
-The names must match the values used in `Jenkinsfile`.
-
-## Jenkins cannot clone repository
-
-Check the `Fetch code` stage.
-
-Expected repository URL:
-
-- `git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'`
+- push to `github-actions`;
+- pull request to `github-actions`;
+- manual run through `workflow_dispatch`.
 
 Also check:
 
-- repository visibility;
-- branch name;
-- Jenkins network access to GitHub;
-- Git installation on the Jenkins agent.
+- workflow file exists in `.github/workflows/`;
+- workflow file is committed to the branch;
+- GitHub Actions are enabled for the repository;
+- branch name is correct.
+
+## Manual workflow run button is missing
+
+The manual run button appears when the workflow includes:
+
+- `workflow_dispatch`
+
+Also check that the workflow file exists on the branch selected in the Actions UI.
+
+## Java or Maven step fails in GitHub Actions
+
+Check the setup step:
+
+- Java version: `17`
+- distribution: `temurin`
+
+The workflow runs on a clean GitHub-hosted runner, so every required setup step must be included in the workflow.
 
 ## SonarQube analysis fails
 
-Check Jenkins SonarQube configuration.
+Check GitHub Actions Secrets:
 
-Configured values:
-
-- **SonarQube server:** `sonarserver`
-- **SonarQube scanner:** `sonar8.0`
+- `SONAR_TOKEN`
+- `SONAR_HOST_URL`
 
 Also check:
 
 - SonarQube server is running;
-- Jenkins can reach the SonarQube URL;
+- `SONAR_HOST_URL` is reachable from the public internet if using GitHub-hosted runners;
+- Nginx or reverse proxy forwards requests to SonarQube correctly;
 - SonarQube token is valid;
-- project key and scanner configuration are correct.
+- project key and scanner arguments are correct.
 
-## Quality Gate stage is stuck
+## SonarQube connection timeout
 
-Check SonarQube webhook configuration.
-
-The Jenkins Quality Gate step requires SonarQube to send the result back to Jenkins.
+A timeout usually means the GitHub-hosted runner cannot reach the SonarQube server.
 
 Check:
 
-- SonarQube webhook URL;
-- Jenkins URL reachable from SonarQube;
-- SonarQube analysis completed successfully;
-- Quality Gate exists in SonarQube.
+- `SONAR_HOST_URL` uses the public URL;
+- the URL includes `http://` or `https://`;
+- security group or firewall allows access;
+- Nginx proxy is working;
+- `/api/server/version` is reachable through the same URL.
+
+If SonarQube is behind Nginx on port `80`, the URL should not include `:9000`.
+
+## Quality Gate fails
+
+Check the SonarQube project result.
+
+Common causes:
+
+- Quality Gate conditions are not met;
+- new code coverage is below the required value;
+- issues or security hotspots require attention;
+- SonarQube analysis configuration is incomplete.
+
+## Artifact upload fails
+
+Check that the build created a JAR file in:
+
+- `target/`
+
+The workflow uploads:
+
+- `target/*.jar`
+
+If no file exists, the Maven build stage must be checked first.
+
+## AWS credentials step fails
+
+Check GitHub Actions Secrets:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+Check GitHub Actions Variable:
+
+- `AWS_REGION`
+
+Common causes:
+
+- missing secret;
+- wrong secret value;
+- invalid AWS access key;
+- AWS region not set;
+- IAM user or role disabled.
 
 ## ECR push fails
 
-Check AWS credentials in Jenkins.
+Check GitHub Actions Variable:
 
-Expected credentials ID:
+- `ECR_REPOSITORY`
 
-- `awscreds`
+Check AWS permissions:
 
-Check AWS CLI access from the Jenkins agent:
-
-- `aws sts get-caller-identity`
-
-Check ECR login and repository access:
-
-- `aws ecr describe-repositories --region us-east-1`
+- ECR authentication permission exists;
+- ECR repository exists;
+- IAM user or role can push images;
+- AWS region matches the ECR repository region.
 
 Common causes:
 
-- invalid AWS credentials;
-- missing ECR permissions;
-- wrong AWS region;
 - ECR repository does not exist;
-- Docker is not authenticated to ECR.
+- wrong AWS region;
+- missing ECR permissions;
+- Docker image tag is invalid.
 
-## ECS deployment fails
+## ECS task definition render fails
 
 Check:
 
-- ECS cluster exists;
-- ECS service exists;
-- task definition template exists: `aws/task-definition-template.json`;
-- AWS region is correct;
-- placeholder exists: `IMAGE_URI_PLACEHOLDER`;
-- Jenkins credential exists: ecr-image-name;
-- Jenkins has ecs:RegisterTaskDefinition;
-- Jenkins has ecs:UpdateService;
-- Jenkins has iam:PassRole;
-- ECS service networking is valid.
+- `aws/task-definition-template.json` exists;
+- the JSON is valid;
+- the container name in the template matches GitHub Actions Variable `CONTAINER_NAME`;
+- the template includes the container that should receive the new image.
 
-## Task definition registration fails
+## ECS deployment fails
+
+Check GitHub Actions Variables:
+
+- `CLUSTER`
+- `SERVICE`
+- `CONTAINER_NAME`
+
+Check AWS permissions:
+
+- `ecs:RegisterTaskDefinition`
+- `ecs:UpdateService`
+- `ecs:DescribeServices`
+- `ecs:DescribeTaskDefinition`
+- `iam:PassRole`
 
 Common causes:
 
-- invalid JSON in `aws/task-definition-template.json`;
-- empty tags array;
-- missing iam:PassRole;
-- wrong execution role ARN;
-- invalid image URI;
-- missing ECR image tag.
+- ECS cluster does not exist;
+- ECS service name is wrong;
+- task definition template is invalid;
+- ECS execution role cannot be passed;
+- service networking is invalid;
+- container port does not match the load balancer target group.
 
 ## ECS task does not stay running
 
@@ -209,3 +263,17 @@ Before committing screenshots to GitHub, hide:
 - private URLs if needed;
 - sensitive infrastructure details;
 - personal data.
+
+## Local run fails because data directory is missing
+
+The application expects a data/ directory in the project root during local execution.
+
+Check that the repository contains:
+
+- `data/.gitkeep`
+
+If the directory is missing, create it manually:
+
+- `mkdir -p data`
+
+Docker and ECS runs are not affected by this local issue because the Docker image creates the required directory during image build.
