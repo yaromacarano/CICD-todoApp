@@ -209,3 +209,17 @@ Before committing screenshots to GitHub, hide:
 - private URLs if needed;
 - sensitive infrastructure details;
 - personal data.
+
+## Local run fails because data directory is missing
+
+The application expects a data/ directory in the project root during local execution.
+
+Check that the repository contains:
+
+- `data/.gitkeep`
+
+If the directory is missing, create it manually:
+
+- mkdir -p data
+
+Docker and ECS runs are not affected by this local issue because the Docker image creates the required directory during image build.

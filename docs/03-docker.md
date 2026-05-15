@@ -12,6 +12,10 @@ The repository contains a `Dockerfile` that runs the built Spring Boot JAR with 
 
 The image build uses the JAR file from the `target/` directory.
 
+The Docker image creates the required data/ directory during image build.
+
+The `data/.gitkeep` file is only used for local execution from the repository root. Docker and ECS use the directory created inside the image.
+
 ## Build application artifact
 
 Command:

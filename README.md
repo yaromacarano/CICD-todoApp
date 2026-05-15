@@ -36,6 +36,7 @@ The pipeline performs these steps:
 - `src/` — Spring Boot application source code
 - `Dockerfile` — Docker image definition
 - `Jenkinsfile` — Jenkins CI/CD pipeline
+- `data/` — keeps the required local data directory available when running the app outside Docker
 - `pom.xml` — Maven project configuration
 - `.gitignore` — ignored local and build files
 - `README.md` — main project overview
@@ -51,6 +52,8 @@ Prerequisites:
 - Java 17
 - Maven 3.9+
 - Git
+
+The application expects a data directory in the project root during local execution. The repository keeps this directory with data/.gitkeep.
 
 Clone the repository:
 

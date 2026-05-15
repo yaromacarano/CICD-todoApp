@@ -21,6 +21,15 @@ Run these commands:
 - `git clone https://github.com/yaromacarano/CICD-todoApp.git`
 - `cd CICD-todoApp`
 
+## Local data directory
+
+The application expects a data/ directory in the project root during local execution.
+The repository keeps this directory with:
+
+- `data/.gitkeep`
+
+This makes local runs work from the repository root without creating the directory manually.
+
 ## Check Java
 
 Command:
