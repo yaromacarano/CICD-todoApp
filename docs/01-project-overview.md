@@ -70,7 +70,7 @@ The project follows a simple CI/CD architecture:
 - `data/.gitkeep` — keeps the local data directory in Git for application runs outside Docker.
 - `pom.xml` — defines Maven build, dependencies, and plugins.
 - `docs/` — contains technical documentation for the project.
-- `docs/screenshots/gitlab-ci/` — stores visual proof of pipeline and deployment results.
+- `docs/screenshots/` — stores visual proof of pipeline and deployment results.
 
 ## Portfolio value
 
