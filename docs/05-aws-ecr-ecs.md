@@ -19,6 +19,8 @@ GitLab CI builds the Docker image, authenticates to AWS ECR, pushes the image, c
 
 The ECS service then starts a deployment with the updated task definition and runs a task using the new image.
 
+AWS deployment commands are executed from the self-hosted GitLab Runner hosted on AWS EC2. The runner is selected by the default tags in `.gitlab-ci.yml`: `aws`, `docker`, and `ec2`.
+
 ## ECR configuration
 
 The pipeline uses GitLab CI/CD variables for ECR configuration:

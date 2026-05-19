@@ -25,6 +25,7 @@ The pipeline performs these steps:
 - **Application:** Java 17, Spring Boot
 - **Build:** Maven
 - **CI/CD:** GitLab CI/CD
+- **CI/CD runner:** Self-hosted GitLab Runner on AWS EC2
 - **Code quality:** Checkstyle, SonarQube Quality Gate
 - **Containerization:** Docker, Docker-in-Docker
 - **Cloud registry:** AWS ECR
@@ -109,6 +110,8 @@ Main stages:
 The deployment flow uses `scripts/deploy-ecs.sh`. The script creates a task definition file from `aws/task-definition-template.json`, registers a new ECS task definition revision, and updates the ECS service.
 
 More pipeline details are documented in `docs/04-gitlab-ci-pipeline.md`.
+
+The GitLab CI pipeline runs on a self-hosted GitLab Runner hosted on an AWS EC2 instance.
 
 ## Screenshots and proof
 

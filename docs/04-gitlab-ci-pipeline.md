@@ -10,6 +10,27 @@ The pipeline automates the flow from tests and code quality checks to Docker ima
 
 Maven tests → Checkstyle analysis → Maven package → SonarQube analysis → Docker image push to ECR → ECS task definition revision deployment
 
+## GitLab Runner
+
+The pipeline runs on a self-hosted GitLab Runner hosted on an AWS EC2 instance.
+
+The runner is selected through the default tags defined in `.gitlab-ci.yml`:
+
+- `aws`
+- `docker`
+- `ec2`
+
+These tags are applied to all jobs by default, so each pipeline job runs on the same self-hosted runner unless a job overrides the tags.
+
+The runner provides the environment required for:
+
+- Maven build execution;
+- Docker image build and push;
+- AWS CLI commands;
+- Amazon ECR authentication;
+- ECS deployment script execution;
+- network access to SonarQube and AWS services.
+
 ## Pipeline stages
 
 The pipeline contains these stages:

@@ -4,6 +4,25 @@
 
 This document contains checks for common issues in the local build, Docker image build, GitLab CI pipeline, SonarQube analysis, AWS ECR push, and AWS ECS deployment.
 
+## GitLab job is stuck or not picked by runner
+
+The pipeline uses a self-hosted GitLab Runner hosted on AWS EC2.
+
+Check that the runner is online and has the required tags:
+
+- `aws`
+- `docker`
+- `ec2`
+
+Also check:
+
+- the runner is registered to the correct GitLab project;
+- the runner is active and not paused;
+- the `.gitlab-ci.yml` default tags match the runner tags;
+- the runner can execute Docker commands;
+- the runner has network access to AWS services;
+- the runner has network access to the SonarQube server.
+
 ## Maven build fails
 
 ### Check Java version
