@@ -142,7 +142,7 @@ Detailed notes are kept in the `docs/` directory:
 - `docs/04-github-actions-workflow.md` — GitHub Actions workflow, secrets, variables, and deployment stages.
 - `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
 - `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, GitHub Actions, SonarQube, ECR, and ECS.
-- `docs/screenshots/github-actions/README.md` — screenshot list used as visual proof of workflow and deployment results.
+- `docs/screenshots/` — screenshot list used as visual proof of workflow and deployment results.
 
 ## Security
 
