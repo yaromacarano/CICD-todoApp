@@ -47,7 +47,7 @@ The pipeline performs these steps:
 - `.gitignore` — ignored local and build files
 - `README.md` — main project overview
 - `docs/` — technical documentation
-- `docs/screenshots/gitlab-ci/` — screenshots used as visual proof of the GitLab CI pipeline and deployment result
+- `docs/screenshots/` — screenshots used as visual proof of the GitLab CI pipeline and deployment result
 
 ## Run locally
 
@@ -115,7 +115,7 @@ The GitLab CI pipeline runs on a self-hosted GitLab Runner hosted on an AWS EC2 
 
 ## Screenshots and proof
 
-Screenshots are stored in `docs/screenshots/gitlab-ci/` and cover the main proof points of the project:
+Screenshots are stored in `docs/screenshots/` and cover the main proof points of the project:
 
 - GitLab repository and branch structure;
 - `.gitlab-ci.yml` pipeline file;
@@ -128,8 +128,6 @@ Screenshots are stored in `docs/screenshots/gitlab-ci/` and cover the main proof
 - running ECS task;
 - application running from the ECS deployment endpoint.
 
-Screenshot naming and content are documented in `docs/screenshots/gitlab-ci/README.md`.
-
 ## Documentation
 
 Detailed notes are kept in the `docs/` directory:
@@ -140,7 +138,7 @@ Detailed notes are kept in the `docs/` directory:
 - `docs/04-gitlab-ci-pipeline.md` — GitLab CI stages, variables, rules, and deployment flow.
 - `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
 - `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, GitLab CI, SonarQube, ECR, and ECS.
-- `docs/screenshots/gitlab-ci/` — screenshot list used as visual proof of pipeline and deployment results.
+- `docs/screenshots/` — screenshot list used as visual proof of pipeline and deployment results.
 
 ## Security
 
