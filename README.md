@@ -119,7 +119,7 @@ Deployment steps run only for direct pushes to the `github-actions` branch.
 
 ## Screenshots and proof
 
-Screenshots are stored in `docs/screenshots/github-actions/` and cover the main proof points of the project:
+Screenshots are stored in `docs/screenshots/` and cover the main proof points of the project:
 
 - GitHub Actions workflow file;
 - successful GitHub Actions workflow run;
@@ -130,7 +130,7 @@ Screenshots are stored in `docs/screenshots/github-actions/` and cover the main 
 - ECS service updated to the new task definition revision;
 - application running from the ECS deployment endpoint.
 
-Screenshot naming and content are documented in `docs/screenshots/github-actions/README.md`.
+Screenshot naming and content are documented in `docs/screenshots/`.
 
 ## Documentation
 
