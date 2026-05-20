@@ -5,6 +5,12 @@ stages:
   - push
   - deploy
 
+default:
+  tags:
+    - aws
+    - docker
+    - ec2
+    
 variables:
   IMAGE_TAG: $CI_PIPELINE_IID
   IMAGE_URI: $ECR_REGISTRY/$ECR_REPOSITORY:$CI_PIPELINE_IID
