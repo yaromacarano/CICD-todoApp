@@ -12,7 +12,7 @@ Command:
 
 - `java -version`
 
-The project uses Java 17.
+The project uses Java 21.
 
 ### Check Maven version
 
@@ -86,7 +86,7 @@ Check Jenkins Global Tool Configuration.
 
 Expected tool names:
 
-- `JDK17`
+- `JDK21`
 - `MAVEN3.9`
 
 The names must match the values used in `Jenkinsfile`.

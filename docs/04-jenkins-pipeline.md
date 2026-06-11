@@ -14,7 +14,7 @@ Fetch code → Maven verification → Checkstyle analysis → SonarQube analysis
 
 The pipeline uses these Jenkins tool names:
 
-- **JDK:** `JDK17`
+- **JDK:** `JDK21`
 - **Maven:** `MAVEN3.9`
 - **SonarQube scanner:** `sonar8.0`
 
@@ -72,13 +72,17 @@ The pipeline uses these AWS and deployment values from the `environment` block:
 
 ## Pipeline stages
 
-### 1. Fetch code
+### 1. VERIFY AGENT
+
+Checks that the Jenkins agent has the required tools installed: Java, Maven, Git, Docker, and AWS CLI.
+
+### 2. Fetch code
 
 Clones the source code from GitHub.
 
 This stage confirms that Jenkins can access the repository and branch.
 
-### 2. UNIT TEST
+### 3. UNIT TEST
 
 Runs Maven verification:
 
@@ -86,25 +90,25 @@ Runs Maven verification:
 
 This stage checks that the project can be compiled and verified through Maven.
 
-### 3. Checkstyle Analysis
+### 4. Checkstyle Analysis
 
 Runs Checkstyle analysis through Maven.
 
 The stage produces a style/static analysis report for the Java codebase.
 
-### 4. Sonar Code Analysis
+### 5. Sonar Code Analysis
 
 Runs SonarQube analysis with the configured SonarQube scanner and server.
 
 This stage sends code quality data to SonarQube.
 
-### 5. Quality Gate
+### 6. Quality Gate
 
 Waits for the SonarQube Quality Gate result.
 
 The pipeline continues only after the quality gate result is received.
 
-### 6. Build
+### 7. Build
 
 Builds the application artifact:
 
@@ -114,19 +118,19 @@ Application artifact:
 
 - `target/todolist-app-1.0.0.jar`
 
-### 7. Build App Image
+### 8. Build App Image
 
 Builds the Docker image using the repository `Dockerfile`.
 
 The image is prepared for upload to AWS ECR.
 
-### 8. Upload App Image
+### 9. Upload App Image
 
 Authenticates to AWS ECR and pushes the Docker image.
 
 This stage confirms that Jenkins has valid AWS and Docker registry access.
 
-### 9. Deploy to ECS
+### 10. Deploy to ECS
 
 Triggers a new deployment of the configured ECS service:
 

@@ -22,7 +22,7 @@ The pipeline performs these steps:
 
 ## Tech stack
 
-- **Application:** Java 17, Spring Boot
+- **Application:** Java 21, Spring Boot
 - **Build:** Maven
 - **CI/CD:** Jenkins Pipeline
 - **Code quality:** Checkstyle, SonarQube Quality Gate
@@ -30,6 +30,19 @@ The pipeline performs these steps:
 - **Cloud registry:** AWS ECR
 - **Cloud runtime:** AWS ECS
 - **Version control:** Git, GitHub
+
+### Jenkins agent-based execution
+
+The Jenkins pipeline runs on a dedicated Jenkins agent with the label `docker-aws-maven`.
+
+The Jenkins controller is used only for orchestration, while the agent performs the actual CI/CD work:
+
+- Maven build and tests
+- Checkstyle and SonarQube analysis
+- Docker image build and push to ECR
+- ECS deployment
+
+This keeps the Jenkins controller clean and makes the setup closer to a production-like CI/CD environment.
 
 ## Repository structure
 
@@ -40,6 +53,8 @@ The pipeline performs these steps:
 - `pom.xml` — Maven project configuration
 - `.gitignore` — ignored local and build files
 - `README.md` — main project overview
+- `scripts/` — helper scripts used by the CI/CD pipeline
+- `scripts/deploy-ecs.sh` — ECS deployment script used by Jenkins to render the task definition, register a new ECS task definition revision, update the ECS service, and wait until the service becomes stable
 - `docs/` — technical documentation
 - `aws/` — AWS deployment templates
 - `aws/task-definition-template.json` — ECS task definition template used by Jenkins during deployment
@@ -49,7 +64,7 @@ The pipeline performs these steps:
 
 Prerequisites:
 
-- Java 17
+- Java 21
 - Maven 3.9+
 - Git
 

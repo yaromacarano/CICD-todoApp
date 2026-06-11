@@ -1,21 +1,42 @@
 pipeline {
-    agent any
+    agent {
+        label 'docker-aws-maven'
+    }
     tools {
         maven "MAVEN3.9"
-        jdk "JDK17"
+        jdk "JDK21"
     }
 
 
     environment {
-        registryCredential = "ecr:us-east-1:awscreds"
-        imageName = credentials('ecr-image-name')
-        Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"
-        service = "todo-ecs-service"
-        cluster = "newcluster"
-        taskDefinition = "todo-task"
-        containerName = "todo"
-    }
+    AWS_REGION = 'us-east-1'
+    ECR_REGISTRY = '551647579168.dkr.ecr.us-east-1.amazonaws.com'
+    ECR_REPOSITORY = 'todo-app'
+    ECS_CLUSTER = 'newcluster'
+    ECS_SERVICE = 'todo-ecs-service'
+    ECS_TASK_FAMILY = 'todo-task'
+    CONTAINER_NAME = 'todo'
+
+    IMAGE_TAG = "${BUILD_NUMBER}"
+    IMAGE_URI = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+    registryCredential = 'ecr:us-east-1:awscreds'
+}
   stages {
+
+        stage('VERIFY AGENT') {
+         steps {
+         sh '''
+            echo "Running on: $(hostname)"
+            whoami
+            java -version
+            mvn -version
+            git --version
+            docker --version
+            aws --version
+            '''
+          }
+        }
 
         stage('Fetch code') {
             steps {
@@ -78,7 +99,7 @@ pipeline {
           steps {
 
             script {
-                dockerImage = docker.build( imageName + ":$BUILD_NUMBER", "./")
+                dockerImage = docker.build("${IMAGE_URI}", "./")
                 }
           }
 
@@ -87,9 +108,8 @@ pipeline {
         stage('Upload App Image') {
           steps{
             script {
-              docker.withRegistry( Registry, registryCredential ) {
-                dockerImage.push("$BUILD_NUMBER")
-                dockerImage.push('latest')
+              docker.withRegistry("https://${ECR_REGISTRY}", registryCredential ) {
+                dockerImage.push()
               }
             }
           }
@@ -97,32 +117,14 @@ pipeline {
 
          stage('Deploy to ECS') {
            steps {
-            withAWS(credentials: 'awscreds', region: 'us-east-1') {
-            sh '''
-                IMAGE_URI="${imageName}:${BUILD_NUMBER}"
-
-                sed "s|IMAGE_URI_PLACEHOLDER|$IMAGE_URI|g" aws/task-definition-template.json > task-definition.json
-
-                NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-                    --cli-input-json file://task-definition.json \
-                    --query 'taskDefinition.taskDefinitionArn' \
-                    --output text)
-
-                aws ecs update-service \
-                    --cluster ${cluster} \
-                    --service ${service} \
-                    --task-definition $NEW_TASK_DEF_ARN
-
-                aws ecs wait services-stable \
-                    --cluster ${cluster} \
-                    --services ${service}
-
-                echo "Deployed image: $IMAGE_URI"
-                echo "Task definition: $NEW_TASK_DEF_ARN"
-            '''
-           }
-        }
-     }
+             withAWS(credentials: 'awscreds', region: "${AWS_REGION}") {
+               sh '''
+                chmod +x scripts/deploy-ecs.sh
+                ./scripts/deploy-ecs.sh
+               '''
+              }
+            }
+          }
 
 
   }
