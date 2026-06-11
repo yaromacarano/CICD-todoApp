@@ -17,11 +17,12 @@ The workflow performs these steps:
 5. Build the Spring Boot application.
 6. Run SonarQube analysis and wait for the Quality Gate.
 7. Upload the build artifact.
-8. Configure AWS credentials.
-9. Build and push the Docker image to AWS ECR.
-10. Render a new ECS task definition with the new image.
-11. Deploy the ECS task definition to the ECS service.
-12. Wait until the ECS service becomes stable.
+8. Download the build artifact in the deployment job.
+9. Configure AWS credentials.
+10. Build and push the Docker image to AWS ECR.
+11. Render a new ECS task definition with the new image.
+12. Deploy the ECS task definition to the ECS service.
+13. Wait until the ECS service becomes stable.
 
 ## Tech stack
 
@@ -44,7 +45,7 @@ The workflow performs these steps:
 - `pom.xml` — Maven project configuration
 - `README.md` — main project overview
 - `docs/` — technical documentation
-- `docs/screenshots/` — screenshots used as visual proof of the workflow and deployment result
+- `docs/screenshots/v2.1-github-actions-ecs-deployment` — screenshots used as visual proof of the workflow and deployment result
 
 ## Branch purpose
 

@@ -19,11 +19,12 @@ The workflow covers:
 5. Application build.
 6. SonarQube analysis with Quality Gate validation.
 7. Build artifact upload.
-8. Docker image build.
-9. Image push to AWS ECR.
-10. ECS task definition rendering with the new image.
-11. ECS service deployment.
-12. ECS service stability check.
+8. Build artifact download in the deployment job.
+9. Docker image build.
+10. Image push to AWS ECR.
+11. ECS task definition rendering with the new image.
+12. ECS service deployment.
+13. ECS service stability check.
 
 ## Main components
 
