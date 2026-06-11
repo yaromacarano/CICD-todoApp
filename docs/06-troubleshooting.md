@@ -26,7 +26,7 @@ Command:
 
 - `java -version`
 
-The project uses Java 17.
+The project uses Java 21.
 
 ### Check Maven version
 
@@ -123,7 +123,7 @@ Also check that the workflow file exists on the branch selected in the Actions U
 
 Check the setup step:
 
-- Java version: `17`
+- Java version: `21`
 - distribution: `temurin`
 
 The workflow runs on a clean GitHub-hosted runner, so every required setup step must be included in the workflow.

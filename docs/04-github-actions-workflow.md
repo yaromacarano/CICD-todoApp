@@ -8,7 +8,21 @@ The workflow automates the flow from source code checkout to AWS ECS deployment 
 
 ## Workflow overview
 
-Checkout code → Set up Java 17 → Maven verification → Checkstyle analysis → Maven package → SonarQube analysis → Artifact upload → AWS authentication → ECR image push → ECS task definition render → ECS deployment → Service stability check
+Checkout code → Set up Java 21 → Maven verification → Checkstyle analysis → Maven package → SonarQube analysis → Artifact upload → Download artifact → AWS authentication → ECR image push → ECS task definition render → ECS deployment → Service stability check
+
+## Workflow jobs
+
+The workflow is split into two jobs:
+
+### `build-test-scan`
+
+This job validates the application before deployment. It runs on a GitHub-hosted runner and performs source checkout, Java setup, Maven verification, Checkstyle analysis, application packaging, SonarQube analysis, Quality Gate waiting, and artifact upload.
+
+### `deploy`
+
+This job depends on `build-test-scan` and runs only after the validation job succeeds.
+
+The deploy job runs only for direct pushes to the `github-actions` branch. It downloads the JAR artifact produced by the first job, configures AWS credentials, builds and pushes the Docker image to ECR, renders the ECS task definition, and deploys it to ECS.
 
 ## Workflow triggers
 
@@ -40,11 +54,9 @@ The runner is created fresh for every workflow run.
 
 ## Environment
 
-The workflow uses the GitHub environment:
+The `production` GitHub environment is used only by the `deploy` job.
 
-- `production`
-
-This groups deployment-related settings and can be used for environment protection rules.
+This keeps deployment-related secrets and variables separated from the validation job. Pull requests run the build, test, Checkstyle, SonarQube, and artifact upload steps without accessing the production environment.
 
 ## GitHub Secrets
 
@@ -81,9 +93,9 @@ Checks out the repository code on the GitHub-hosted runner.
 
 The workflow uses `fetch-depth: 0` so the full Git history is available for code analysis.
 
-### 2. Setup JDK 17
+### 2. Setup JDK 21
 
-Installs Java 17 using the Temurin distribution.
+Installs Java 21 using the Temurin distribution.
 
 The workflow also enables Maven dependency caching.
 
@@ -137,29 +149,49 @@ Artifact path:
 
 - `target/*.jar`
 
-### 8. Configure AWS Credentials
+### 8. Download artifact
+
+The `deploy` job downloads the JAR artifact produced by the `build-test-scan` job.
+
+Artifact name:
+
+- `todolist-app-1.0.0`
+
+Artifact download path:
+
+- `target`
+
+This is required because each GitHub Actions job runs on a fresh runner and does not automatically share the `target/` directory with other jobs.
+
+### 9. Configure AWS Credentials
 
 Configures AWS credentials for the deployment steps.
 
 This step runs only for direct pushes to `github-actions`, not for pull requests.
 
-### 9. Login to Amazon ECR
+### 10. Login to Amazon ECR
 
 Authenticates Docker to AWS ECR.
 
 The action returns the ECR registry URL used in the Docker image name.
 
-### 10. Build, tag and push image to ECR
+### 11. Build, tag and push image to ECR
 
 Builds the Docker image from the repository `Dockerfile`.
 
-The image tag uses the GitHub Actions run number:
+The image tag combines the GitHub Actions run number and the short commit SHA.
 
-- `github.run_number`
+Example format:
 
-The image URI is saved as workflow output and passed to the ECS deployment steps.
+- `"${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"`
 
-### 11. Render ECS task definition
+Example:
+
+- `25-a1b2c3d`
+
+This makes the image easier to trace back to both the workflow run and the source commit.
+
+### 12. Render ECS task definition
 
 Uses the ECS task definition template from:
 
@@ -169,7 +201,7 @@ The workflow replaces the container image with the newly pushed ECR image.
 
 The container name is loaded from GitHub Actions Variable `CONTAINER_NAME`.
 
-### 12. Deploy ECS task definition
+### 13. Deploy ECS task definition
 
 Deploys the rendered ECS task definition to the configured ECS service and cluster.
 
@@ -180,7 +212,7 @@ The deployment waits until the ECS service becomes stable.
 A successful workflow run confirms that:
 
 - GitHub Actions can check out the repository;
-- Java 17 and Maven build steps work on a clean runner;
+- Java 21 and Maven build steps work on a clean runner;
 - Checkstyle analysis runs;
 - SonarQube analysis and Quality Gate pass;
 - the application JAR is built and uploaded as an artifact;

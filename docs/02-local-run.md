@@ -8,7 +8,7 @@ Local execution checks the application before running the GitHub Actions workflo
 
 ## Prerequisites
 
-- Java 17
+- Java 21
 - Maven 3.9+
 - Git
 
@@ -40,7 +40,7 @@ Command:
 
 Expected major version:
 
-- `17`
+- `21`
 
 ## Check Maven
 
@@ -111,7 +111,7 @@ Use `Ctrl + C` in the terminal where the application is running.
 
 Local verification checks:
 
-- `java -version` shows Java 17;
+- `java -version` shows Java 21;
 - `mvn clean verify` completes successfully;
 - `mvn clean package` creates the JAR file in `target/`;
 - the application starts on port `8080`.

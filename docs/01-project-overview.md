@@ -13,7 +13,7 @@ GitHub → GitHub Actions → Maven → Checkstyle → SonarQube → Docker → 
 The workflow covers:
 
 1. Source code checkout from GitHub.
-2. Java 17 setup on a GitHub-hosted runner.
+2. Java 21 setup on a GitHub-hosted runner.
 3. Maven verification.
 4. Checkstyle analysis.
 5. Application build.

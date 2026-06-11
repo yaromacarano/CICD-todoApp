@@ -11,7 +11,7 @@ GitHub Repository → GitHub Actions → Maven → Checkstyle → SonarQube → 
 The workflow performs these steps:
 
 1. Fetch source code from GitHub.
-2. Set up Java 17 on the GitHub-hosted runner.
+2. Set up Java 21 on the GitHub-hosted runner.
 3. Run Maven verification.
 4. Run Checkstyle analysis.
 5. Build the Spring Boot application.
@@ -25,7 +25,7 @@ The workflow performs these steps:
 
 ## Tech stack
 
-- **Application:** Java 17, Spring Boot
+- **Application:** Java 21, Spring Boot
 - **Build:** Maven
 - **CI/CD:** GitHub Actions
 - **Code quality:** Checkstyle, SonarQube Quality Gate
@@ -59,7 +59,7 @@ The application and AWS deployment target remain the same. The CI/CD engine is d
 
 Prerequisites:
 
-- Java 17
+- Java 21
 - Maven 3.9+
 - Git
 
@@ -103,19 +103,12 @@ More Docker details are documented in `docs/03-docker.md`.
 
 ## GitHub Actions workflow
 
-The workflow is defined in:
+The workflow is split into two jobs:
 
-- `.github/workflows/deploy.yml`
+- `build-test-scan` — validates the application, runs quality checks, builds the JAR, and uploads it as an artifact.
+- `deploy` — downloads the JAR artifact, builds and pushes the Docker image, and deploys the new ECS task definition.
 
-It runs on:
-
-- push to `github-actions`
-- pull request to `github-actions`
-- manual start through `workflow_dispatch`
-
-Pull requests run build, tests, Checkstyle, SonarQube analysis, and artifact upload.
-
-Deployment steps run only for direct pushes to the `github-actions` branch.
+The `deploy` job depends on `build-test-scan` and runs only for direct pushes to the `github-actions` branch.
 
 ## Screenshots and proof
 

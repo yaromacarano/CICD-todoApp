@@ -22,7 +22,7 @@ Deployment flow:
 1. GitHub Actions configures AWS credentials.
 2. The workflow logs in to AWS ECR.
 3. The Docker image is built from the repository `Dockerfile`.
-4. The image is tagged with the GitHub Actions run number.
+4. The image is tagged with the GitHub Actions run number and the short commit SHA.
 5. The image is pushed to AWS ECR.
 6. The workflow renders `aws/task-definition-template.json` with the new image.
 7. AWS ECS receives a new task definition revision.
@@ -47,7 +47,7 @@ The final image URI is created during the workflow from:
 
 Image format:
 
-- `ECR_REGISTRY/ECR_REPOSITORY:github.run_number`
+- `IMAGE_TAG="${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"`
 
 ## ECS configuration
 
@@ -121,7 +121,7 @@ The AWS IAM user or role used by GitHub Actions needs access to these AWS API ar
 
 After a successful GitHub Actions run, the AWS console shows:
 
-- a new image in ECR with the GitHub Actions run number tag;
+- a new image in ECR with a tag based on the GitHub Actions run number and short commit SHA;
 - a new ECS task definition revision;
 - ECS service deployment activity;
 - running ECS task;
