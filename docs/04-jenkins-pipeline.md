@@ -134,7 +134,7 @@ This stage confirms that Jenkins has valid AWS and Docker registry access.
 
 Triggers a new deployment of the configured ECS service:
 
-- Jenkins builds `IMAGE_URI` from imageName and `BUILD_NUMBER`;
+- Jenkins builds `IMAGE_URI` from `ECR_REPOSITORY` and `BUILD_NUMBER`;
 - Jenkins replaces `IMAGE_URI_PLACEHOLDER` in aws/task-definition-template.json;
 - Jenkins creates task-definition.json;
 - Jenkins registers a new ECS task definition revision;

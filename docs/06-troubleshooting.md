@@ -168,7 +168,6 @@ Check:
 - task definition template exists: `aws/task-definition-template.json`;
 - AWS region is correct;
 - placeholder exists: `IMAGE_URI_PLACEHOLDER`;
-- Jenkins credential exists: ecr-image-name;
 - Jenkins has ecs:RegisterTaskDefinition;
 - Jenkins has ecs:UpdateService;
 - Jenkins has iam:PassRole;
