@@ -77,6 +77,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Download artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: todolist-app-1.0.0
+          path: target
+
       - name: Configure AWS Credentials
         if: github.ref == 'refs/heads/github-actions' && github.event_name != 'pull_request'
         uses: aws-actions/configure-aws-credentials@v4
