@@ -112,7 +112,7 @@ Screenshots are stored in `docs/screenshots/` and cover the main proof points of
 - GitHub repository structure;
 - successful Jenkins pipeline run;
 - Jenkins stage view;
-- SonarQube project and Quality Gate;
+- SonarQube Quality Gate;
 - Docker image in AWS ECR;
 - AWS ECS service deployment;
 - running ECS task;

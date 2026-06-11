@@ -66,6 +66,7 @@ The project follows a simple CI/CD architecture:
 - `docs/` — contains technical documentation for the project.
 - `docs/screenshots/v1.1-ecs-task-revision-deployment` — stores visual proof of pipeline and deployment results.
 - `aws/task-definition-template.json` — ECS task definition template used for deployment revision creation
+- `scripts/deploy-ecs.sh` — helper script used by Jenkins to render the ECS task definition, register a new revision, update the ECS service, and wait until the service becomes stable.
 
 ## Portfolio value
 

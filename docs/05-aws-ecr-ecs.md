@@ -22,24 +22,24 @@ The ECS service then starts a new deployment cycle and runs a task with the conf
 
 The pipeline uses this image name:
 
-- `imageName` is stored in Jenkins credential `ecr-image-name`.
+- `ECR_REPOSITORY = "todo-app"`
 
 Registry value:
 
-- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
+- `ECR_REGISTRY = "551647579168.dkr.ecr.us-east-1.amazonaws.com"`
 
 AWS region:
 
-- `region = "us-east-1"`
+- `AWS_REGION = "us-east-1"`
 
 ## ECS configuration
 
 The pipeline triggers deployment for this ECS service:
 
-- `cluster = "newcluster"`
-- `service = "todo-ecs-service"`
-- `taskDefinition = "todo-task"`
-- `containerName = "todo"`
+- `ECS_CLUSTER = "newcluster"`
+- `ECS_SERVICE = "todo-ecs-service"`
+- `ECS_TASK_FAMILY = "todo-task"`
+- `CONTAINER_NAME = "todo"`
 
 ## ECS task definition template
 
@@ -51,7 +51,7 @@ The pipeline triggers deployment for this ECS service:
 
 The AWS environment contains:
 
-- ECR repository: `todo-appimg`;
+- ECR repository: `todo-app`;
 - ECS cluster: `newcluster`;
 - ECS service: `todo-ecs-service`;
 - ECS task definition configured with the ECR image;

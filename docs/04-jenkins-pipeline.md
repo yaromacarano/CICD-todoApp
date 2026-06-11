@@ -62,13 +62,13 @@ Current repository URL:
 
 The pipeline uses these AWS and deployment values from the `environment` block:
 
-- `registryCredential = "ecr:us-east-1:awscreds"`
-- `imageName = credentials('ecr-image-name')`
-- `Registry = "https://551647579168.dkr.ecr.us-east-1.amazonaws.com"`
-- `service = "todo-ecs-service"`
-- `taskDefinition = "todo-task"`
-- `containerName = "todo"`
-- `cluster = "newcluster"`
+- `AWS_REGION = 'us-east-1'`
+- `ECR_REGISTRY = '551647579168.dkr.ecr.us-east-1.amazonaws.com'`
+- `ECR_REPOSITORY = 'todo-app'`
+- `ECS_CLUSTER = 'newcluster'`
+- `ECS_SERVICE = 'todo-ecs-service'`
+- `ECS_TASK_FAMILY = 'todo-task'`
+- `CONTAINER_NAME = 'todo'`
 
 ## Pipeline stages
 
@@ -112,7 +112,7 @@ The pipeline continues only after the quality gate result is received.
 
 Builds the application artifact:
 
-- `mvn clean package`
+- `mvn package -DskipTests`
 
 Application artifact:
 
