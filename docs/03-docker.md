@@ -8,7 +8,7 @@ Docker is used to create a consistent runtime image for the Spring Boot applicat
 
 ## Dockerfile role
 
-The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 17.
+The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 21.
 
 The image build uses the JAR file from the `target/` directory.
 
