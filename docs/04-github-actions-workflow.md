@@ -175,21 +175,17 @@ Authenticates Docker to AWS ECR.
 
 The action returns the ECR registry URL used in the Docker image name.
 
-### 11. Build, tag and push image to ECR
+### 11. Build, tag and push image to ECR 
 
-Builds the Docker image from the repository `Dockerfile`.
+Builds the Docker image from the repository `Dockerfile`. 
 
-The image tag combines the GitHub Actions run number and the short commit SHA.
+The image is tagged with the GitHub Actions run number. 
 
-Example format:
+Example format: 
 
-- `"${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}"`
+- `${{ github.run_number }}`
 
-Example:
-
-- `25-a1b2c3d`
-
-This makes the image easier to trace back to both the workflow run and the source commit.
+This makes the image easy to match with the GitHub Actions workflow run.
 
 ### 12. Render ECS task definition
 
