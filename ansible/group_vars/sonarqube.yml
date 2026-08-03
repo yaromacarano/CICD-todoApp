@@ -1,0 +1,10 @@
+---
+sonarqube_version: 10.7.0.96327
+sonarqube_archive_url: "https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-{{ sonarqube_version }}.zip"
+sonarqube_user: sonarqube
+sonarqube_group: sonarqube
+sonarqube_install_directory: /opt/sonarqube-{{ sonarqube_version }}
+sonarqube_home: /opt/sonarqube
+sonarqube_java_package: openjdk-17-jre-headless
+sonarqube_java_home: /usr/lib/jvm/java-17-openjdk-amd64
+sonarqube_port: 9000

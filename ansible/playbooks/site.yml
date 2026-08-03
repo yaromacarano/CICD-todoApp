@@ -1,0 +1,9 @@
+---
+- name: Configure Jenkins Controller
+  ansible.builtin.import_playbook: setup-jenkins-controller.yml
+
+- name: Configure Jenkins Agent
+  ansible.builtin.import_playbook: setup-jenkins-agent.yml
+
+- name: Configure SonarQube
+  ansible.builtin.import_playbook: setup-sonarqube.yml

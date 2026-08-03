@@ -1,0 +1,13 @@
+[jenkins_controller]
+jenkins-controller ansible_host=203.0.113.11
+
+[jenkins_agents]
+jenkins-agent ansible_host=203.0.113.12
+
+[sonarqube]
+sonarqube-server ansible_host=203.0.113.13
+
+[all:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/todo-app-key.pem
+ansible_python_interpreter=/usr/bin/python3

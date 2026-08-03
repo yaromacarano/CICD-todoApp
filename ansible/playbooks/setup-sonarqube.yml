@@ -1,0 +1,142 @@
+---
+- name: Install and start SonarQube
+  hosts: sonarqube
+  become: true
+
+  tasks:
+    - name: Update the apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages and Java
+      ansible.builtin.apt:
+        name: "{{ common_packages + [sonarqube_java_package] }}"
+        state: present
+
+    - name: Create the SonarQube group
+      ansible.builtin.group:
+        name: "{{ sonarqube_group }}"
+        state: present
+
+    - name: Create the SonarQube user
+      ansible.builtin.user:
+        name: "{{ sonarqube_user }}"
+        group: "{{ sonarqube_group }}"
+        home: "{{ sonarqube_home }}"
+        shell: /usr/sbin/nologin
+        system: true
+        create_home: false
+        state: present
+
+    - name: Configure kernel settings required by SonarQube
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-sonarqube.conf
+        mode: "0644"
+        content: |
+          vm.max_map_count=524288
+          fs.file-max=131072
+      notify: Apply SonarQube kernel settings
+
+    - name: Configure limits required by SonarQube
+      ansible.builtin.copy:
+        dest: /etc/security/limits.d/99-sonarqube.conf
+        mode: "0644"
+        content: |
+          {{ sonarqube_user }} soft nofile 131072
+          {{ sonarqube_user }} hard nofile 131072
+          {{ sonarqube_user }} soft nproc 8192
+          {{ sonarqube_user }} hard nproc 8192
+
+    - name: Apply changed kernel settings before starting SonarQube
+      ansible.builtin.meta: flush_handlers
+
+    - name: Download SonarQube
+      ansible.builtin.get_url:
+        url: "{{ sonarqube_archive_url }}"
+        dest: "/tmp/sonarqube-{{ sonarqube_version }}.zip"
+        mode: "0644"
+
+    - name: Extract SonarQube
+      ansible.builtin.unarchive:
+        src: "/tmp/sonarqube-{{ sonarqube_version }}.zip"
+        dest: /opt
+        remote_src: true
+        creates: "{{ sonarqube_install_directory }}/bin/linux-x86-64/sonar.sh"
+
+    - name: Set ownership of the SonarQube installation
+      ansible.builtin.file:
+        path: "{{ sonarqube_install_directory }}"
+        state: directory
+        owner: "{{ sonarqube_user }}"
+        group: "{{ sonarqube_group }}"
+        recurse: true
+
+    - name: Create the current SonarQube link
+      ansible.builtin.file:
+        src: "{{ sonarqube_install_directory }}"
+        dest: "{{ sonarqube_home }}"
+        state: link
+        force: true
+
+    - name: Configure the SonarQube web listener
+      ansible.builtin.lineinfile:
+        path: "{{ sonarqube_home }}/conf/sonar.properties"
+        regexp: '^#?sonar.web.host='
+        line: sonar.web.host=0.0.0.0
+      notify: Restart SonarQube
+
+    - name: Configure the SonarQube web port
+      ansible.builtin.lineinfile:
+        path: "{{ sonarqube_home }}/conf/sonar.properties"
+        regexp: '^#?sonar.web.port='
+        line: "sonar.web.port={{ sonarqube_port }}"
+      notify: Restart SonarQube
+
+    - name: Create the SonarQube systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/sonarqube.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=SonarQube service
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ sonarqube_user }}
+          Group={{ sonarqube_group }}
+          Environment="JAVA_HOME={{ sonarqube_java_home }}"
+          ExecStart={{ sonarqube_home }}/bin/linux-x86-64/sonar.sh console
+          Restart=on-failure
+          LimitNOFILE=131072
+          LimitNPROC=8192
+          SuccessExitStatus=143
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart SonarQube
+
+    - name: Start and enable SonarQube
+      ansible.builtin.systemd_service:
+        name: sonarqube
+        state: started
+        enabled: true
+        daemon_reload: true
+
+  handlers:
+    - name: Apply SonarQube kernel settings
+      ansible.builtin.command:
+        cmd: /sbin/sysctl --system
+      changed_when: true
+
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Restart SonarQube
+      ansible.builtin.systemd_service:
+        name: sonarqube
+        state: restarted

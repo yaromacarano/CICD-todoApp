@@ -1,0 +1,100 @@
+---
+- name: Configure the Jenkins Agent
+  hosts: jenkins_agents
+  become: true
+
+  tasks:
+    - name: Update the apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages, Java, and Docker
+      ansible.builtin.apt:
+        name: "{{ common_packages + [jenkins_agent_java_package, 'docker.io'] }}"
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create the Jenkins group
+      ansible.builtin.group:
+        name: "{{ jenkins_agent_group }}"
+        state: present
+
+    - name: Create the Jenkins user
+      ansible.builtin.user:
+        name: "{{ jenkins_agent_user }}"
+        group: "{{ jenkins_agent_group }}"
+        groups: docker
+        append: true
+        create_home: true
+        home: "{{ jenkins_agent_home }}"
+        shell: /bin/bash
+        state: present
+
+    - name: Create the Jenkins SSH directory
+      ansible.builtin.file:
+        path: "{{ jenkins_agent_home }}/.ssh"
+        state: directory
+        owner: "{{ jenkins_agent_user }}"
+        group: "{{ jenkins_agent_group }}"
+        mode: "0700"
+
+    - name: Allow the EC2 key to connect as the Jenkins user
+      ansible.builtin.copy:
+        src: "/home/{{ ansible_user }}/.ssh/authorized_keys"
+        dest: "{{ jenkins_agent_home }}/.ssh/authorized_keys"
+        remote_src: true
+        owner: "{{ jenkins_agent_user }}"
+        group: "{{ jenkins_agent_group }}"
+        mode: "0600"
+
+    - name: Create the Jenkins agent work directory
+      ansible.builtin.file:
+        path: "{{ jenkins_agent_work_directory }}"
+        state: directory
+        owner: "{{ jenkins_agent_user }}"
+        group: "{{ jenkins_agent_group }}"
+        mode: "0755"
+
+    - name: Download Maven
+      ansible.builtin.get_url:
+        url: "{{ maven_archive_url }}"
+        dest: "/tmp/apache-maven-{{ maven_version }}-bin.tar.gz"
+        mode: "0644"
+
+    - name: Install Maven
+      ansible.builtin.unarchive:
+        src: "/tmp/apache-maven-{{ maven_version }}-bin.tar.gz"
+        dest: /opt
+        remote_src: true
+        creates: "/opt/apache-maven-{{ maven_version }}/bin/mvn"
+
+    - name: Create the Maven command link
+      ansible.builtin.file:
+        src: "/opt/apache-maven-{{ maven_version }}/bin/mvn"
+        dest: /usr/local/bin/mvn
+        state: link
+        force: true
+
+    - name: Download AWS CLI version 2
+      ansible.builtin.get_url:
+        url: "{{ aws_cli_archive_url }}"
+        dest: /tmp/awscliv2.zip
+        mode: "0644"
+
+    - name: Extract AWS CLI version 2
+      ansible.builtin.unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: true
+        creates: /tmp/aws/install
+
+    - name: Install AWS CLI version 2
+      ansible.builtin.command:
+        cmd: /tmp/aws/install
+        creates: /usr/local/bin/aws

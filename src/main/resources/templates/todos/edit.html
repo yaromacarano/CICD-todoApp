@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Todo - TodoListApp</title>
+    <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-primary border-bottom box-shadow mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand" th:href="@{/todos}">
+                    <i class="bi bi-check2-square"></i> TodoListApp
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-white" th:href="@{/todos}">
+                                <i class="bi bi-list-task"></i> Todo List
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" th:href="@{/todos/create}">
+                                <i class="bi bi-plus-circle"></i> New Todo
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            <div class="container mt-4">
+                <div class="row">
+                    <div class="col-md-8 offset-md-2">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h2 class="mb-0">Edit Todo</h2>
+                            </div>
+                            <div class="card-body">
+                                <form th:action="@{/todos/edit/{id}(id=${todo.id})}" th:object="${todo}" method="post">
+                                    <input type="hidden" th:field="*{id}" />
+                                    
+                                    <!-- Validation errors inside card body like original -->
+                                    <div th:if="${#fields.hasErrors('*')}" class="alert alert-danger">
+                                        <ul>
+                                            <li th:each="error : ${#fields.errors('*')}" th:text="${error}"></li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label th:for="description" class="form-label">Description</label>
+                                        <input th:field="*{description}" class="form-control" />
+                                        <span th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="text-danger"></span>
+                                    </div>
+                                    
+                                    <div class="mb-3 form-check">
+                                        <input th:field="*{completed}" type="checkbox" class="form-check-input" />
+                                        <label th:for="completed" class="form-check-label">Completed</label>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-save"></i> Update
+                                        </button>
+                                        <a th:href="@{/todos}" class="btn btn-outline-secondary">
+                                            <i class="bi bi-arrow-left"></i> Back to List
+                                        </a>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer text-muted">
+        <div class="container">
+            &copy; 2025 - TodoListApp - Created on <span th:text="${#dates.format(#dates.createNow(), 'yyyy-MM-dd')}"></span>
+        </div>
+    </footer>
+    <script src="/lib/jquery/dist/jquery.min.js"></script>
+    <script src="/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/site.js"></script>
+    
+    <!-- Validation Scripts -->
+    <script src="/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+</body>
+</html>

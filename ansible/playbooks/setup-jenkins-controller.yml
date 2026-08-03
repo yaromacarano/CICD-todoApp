@@ -1,0 +1,39 @@
+---
+- name: Install and start Jenkins Controller
+  hosts: jenkins_controller
+  become: true
+
+  tasks:
+    - name: Update the apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages and Java
+      ansible.builtin.apt:
+        name: "{{ common_packages + [jenkins_java_package, 'fontconfig'] }}"
+        state: present
+
+    - name: Download the Jenkins repository key
+      ansible.builtin.get_url:
+        url: "{{ jenkins_repository_key_url }}"
+        dest: /etc/apt/keyrings/jenkins-keyring.asc
+        mode: "0644"
+
+    - name: Add the Jenkins apt repository
+      ansible.builtin.apt_repository:
+        repo: "{{ jenkins_repository }}"
+        filename: jenkins
+        state: present
+        update_cache: true
+
+    - name: Install Jenkins
+      ansible.builtin.apt:
+        name: jenkins
+        state: present
+
+    - name: Start and enable Jenkins
+      ansible.builtin.service:
+        name: jenkins
+        state: started
+        enabled: true

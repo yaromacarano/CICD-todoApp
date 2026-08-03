@@ -1,0 +1,9 @@
+---
+jenkins_agent_user: jenkins
+jenkins_agent_group: jenkins
+jenkins_agent_home: /home/jenkins
+jenkins_agent_work_directory: /home/jenkins/agent
+jenkins_agent_java_package: openjdk-21-jdk
+maven_version: 3.9.11
+maven_archive_url: "https://archive.apache.org/dist/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz"
+aws_cli_archive_url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
