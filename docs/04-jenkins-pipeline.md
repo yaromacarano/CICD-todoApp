@@ -4,11 +4,11 @@
 
 This document explains the CI/CD pipeline defined in `Jenkinsfile`.
 
-The pipeline automates the flow from source code checkout to AWS ECS deployment trigger.
+The pipeline automates the flow from source code checkout to AWS ECS deployment using a new task definition revision.
 
 ## Pipeline overview
 
-Fetch code → Maven verification → Checkstyle analysis → SonarQube analysis → Quality Gate → Maven package → Docker image build → Docker image push to ECR → ECS service deployment trigger
+Fetch code → Maven verification → Checkstyle analysis → SonarQube analysis → Quality Gate → Maven package → Docker image build → Docker image push to ECR → ECS task definition revision registration → ECS service update → ECS service stability check
 
 ## Jenkins tools
 
@@ -20,6 +20,11 @@ The pipeline uses these Jenkins tool names:
 
 The tool names in Jenkins must match the values used in `Jenkinsfile`.
 
+## Jenkins agent
+
+The pipeline runs on a dedicated Jenkins agent with the label docker-aws-maven.
+
+The Jenkins controller is used for orchestration, while the agent performs Maven builds, code analysis, Docker image operations, AWS CLI commands, and ECS deployment.
 
 ## Jenkins plugins
 
@@ -40,7 +45,7 @@ Installed plugins for this setup:
 - **Build Timestamp Plugin** — build timestamp variables for logs and build metadata.
 - **Workspace Cleanup Plugin** — workspace cleanup before or after pipeline runs.
 
-These plugins support the current pipeline stages from GitHub checkout to Docker image delivery and AWS ECS deployment trigger.
+These plugins support the current pipeline stages from GitHub checkout to Docker image delivery and AWS ECS deployment.
 
 ## Jenkins integrations
 

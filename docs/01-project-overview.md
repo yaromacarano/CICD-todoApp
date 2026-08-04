@@ -43,7 +43,7 @@ The DevOps part of the repository covers:
 - code quality checks before image publishing;
 - Docker image creation;
 - image publishing to AWS ECR;
-- ECS service deployment trigger;
+- ECS task definition revision deployment;
 - technical documentation for setup and troubleshooting.
 
 ## Architecture
