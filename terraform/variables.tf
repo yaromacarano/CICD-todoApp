@@ -19,7 +19,7 @@ variable "environment" {
 variable "key_name" {
   description = "Name of an existing EC2 key pair used to access the instances."
   type        = string
-  default     = "todo-key"
+  default     = "todo-app-key"
 }
 
 variable "admin_cidr" {
