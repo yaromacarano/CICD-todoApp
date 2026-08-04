@@ -1,111 +1,94 @@
-# Local Run Guide
+# Running the Application Locally
 
-## Purpose
-
-This document describes how to build and run the application on a local machine.
-
-Local execution is useful for checking the application before running the Jenkins pipeline or building the Docker image.
+Running the application locally is the quickest way to verify a change before building a container or starting the Jenkins Pipeline.
 
 ## Prerequisites
 
+Install the following tools:
+
 - Java 21
-- Maven 3.9+
+- Maven 3.9 or newer
 - Git
 
-Docker is only required for container testing. The application can be built and started without Docker.
+Docker is optional for this part. The application builds and runs directly with Java and Maven.
 
-## Clone repository
+## Clone the repository
 
-Run these commands:
+```bash
+git clone https://github.com/yaromacarano/CICD-todoApp.git
+cd CICD-todoApp
+```
 
-- `git clone https://github.com/yaromacarano/CICD-todoApp.git`
-- `cd CICD-todoApp`
+## Verify Java and Maven
+
+```bash
+java -version
+mvn -version
+```
+
+Java should report major version `21`, and Maven should report version `3.9.x` or newer.
 
 ## Local data directory
 
-The application expects a data/ directory in the project root during local execution.
-The repository keeps this directory with:
+The application stores its SQLite database under `data/` in the repository root. The `data/.gitkeep` file preserves this directory in Git, so no additional setup is normally required after cloning.
 
-- `data/.gitkeep`
+If the directory is missing, create it before starting the application:
 
-This makes local runs work from the repository root without creating the directory manually.
+```bash
+mkdir -p data
+```
 
-## Check Java
+## Verify the project
 
-Command:
+Run the full Maven verification lifecycle:
 
-- `java -version`
+```bash
+mvn clean verify
+```
 
-Expected major version:
+This command clears previous build output, compiles the project, runs the configured tests, and completes Maven verification.
 
-- `21`
+## Start with Maven
 
-## Check Maven
+```bash
+mvn spring-boot:run
+```
 
-Command:
+Open the application at:
 
-- `mvn -version`
+```text
+http://localhost:8080
+```
 
-Expected Maven version:
+Press `Ctrl+C` in the terminal to stop it.
 
-- `3.9.x` or newer
+## Build and run the JAR
 
-## Run verification
+Create the application package:
 
-Command:
+```bash
+mvn clean package
+```
 
-- `mvn clean verify`
+Maven writes the artifact to:
 
-This command performs the Maven verification flow:
+```text
+target/todolist-app-1.0.0.jar
+```
 
-- removes previous build output;
-- compiles the project;
-- runs tests configured in the project;
-- verifies the Maven project state.
+Run it directly with Java:
 
-## Build JAR
+```bash
+java -jar target/todolist-app-1.0.0.jar
+```
 
-Command:
+The application is again available at `http://localhost:8080`.
 
-- `mvn clean package`
+## Quick verification
 
-The build artifact is created in:
+A local run is ready when:
 
-- `target/`
-
-The Jenkins pipeline uses this artifact name:
-
-- `target/todolist-app-1.0.0.jar`
-
-## Run with Maven
-
-Command:
-
-- `mvn spring-boot:run`
-
-Application URL:
-
-- `http://localhost:8080`
-
-## Run built JAR
-
-Command:
-
-- `java -jar target/todolist-app-1.0.0.jar`
-
-Application URL:
-
-- `http://localhost:8080`
-
-## Stop application
-
-Use `Ctrl + C` in the terminal where the application is running.
-
-## Local verification checklist
-
-Local verification checks:
-
-- `java -version` shows Java 21;
-- `mvn clean verify` completes successfully;
-- `mvn clean package` creates the JAR file in `target/`;
-- the application starts on port `8080`.
+- Java reports version 21;
+- `mvn clean verify` finishes successfully;
+- `mvn clean package` creates the expected JAR;
+- the application responds on port `8080`.

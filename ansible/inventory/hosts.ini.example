@@ -1,11 +1,11 @@
 [jenkins_controller]
-jenkins-controller ansible_host=203.0.113.11
+jenkins-controller ansible_host=172.31.0.11
 
 [jenkins_agents]
-jenkins-agent ansible_host=203.0.113.12
+jenkins-agent ansible_host=172.31.0.12
 
 [sonarqube]
-sonarqube-server ansible_host=203.0.113.13
+sonarqube-server ansible_host=172.31.0.13
 
 [all:vars]
 ansible_user=ubuntu

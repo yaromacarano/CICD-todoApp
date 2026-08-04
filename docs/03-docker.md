@@ -1,86 +1,87 @@
-# Docker Guide
+# Running the Application with Docker
 
-## Purpose
+The repository packages the Spring Boot application into the same container format that Jenkins publishes to AWS ECR and deploys through ECS Fargate.
 
-This document describes how the application is packaged and run as a Docker container.
+## How the image is built
 
-Docker is used to create a consistent runtime image for the Spring Boot application. The same image format is used by the Jenkins pipeline before publishing to AWS ECR.
+The `Dockerfile` uses Java 21 and copies the packaged application from `target/`. It also creates `/app/data`, where the application stores its SQLite database inside the container.
 
-## Dockerfile role
+The root `.dockerignore` keeps the build context small and prevents local infrastructure files, SSH keys, Git metadata, and other unrelated files from being sent to the Docker daemon.
 
-The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 21.
+## Build the application
 
-The image build uses the JAR file from the `target/` directory.
+Create the JAR from the repository root:
 
-The Docker image creates the required data/ directory during image build.
+```bash
+mvn clean package -DskipTests
+```
 
-The `data/.gitkeep` file is only used for local execution from the repository root. Docker and ECS use the directory created inside the image.
+The Docker build expects this exact file:
 
-## Build application artifact
+```text
+target/todolist-app-1.0.0.jar
+```
 
-Command:
+## Build the image
 
-- `mvn clean package -DskipTests`
+```bash
+docker build -t todo-app:v1.0 .
+```
 
-Expected artifact:
+Confirm that the image exists:
 
-- `target/todolist-app-1.0.0.jar`
+```bash
+docker images todo-app
+```
 
-## Build Docker image
+## Run the container
 
-Command:
+```bash
+docker run --rm -p 8080:8080 todo-app:v1.0
+```
 
-- `docker build -t todo-app:v1.0 .`
+Open:
 
-## Check image
+```text
+http://localhost:8080
+```
 
-Command:
+Because the command uses `--rm` and does not mount a volume, the container's SQLite data is removed when the container stops.
 
-- `docker images | grep todo-app`
+## Run in the background
 
-## Run container
+```bash
+docker run -d --name todo-app -p 8080:8080 todo-app:v1.0
+```
 
-Command:
+Inspect the running container and its logs:
 
-- `docker run --rm -p 8080:8080 todo-app:v1.0`
+```bash
+docker ps
+docker logs -f todo-app
+```
 
-Application URL:
+Stop and remove it when finished:
 
-- `http://localhost:8080`
+```bash
+docker stop todo-app
+docker rm todo-app
+```
 
-## Check running container
+## Jenkins image flow
 
-Command:
+The Jenkins Pipeline handles the image in two stages:
 
-- `docker ps`
+- **Build App Image** builds the image from the repository `Dockerfile`.
+- **Upload App Image** authenticates to AWS ECR and pushes the image.
 
-## Stop container
+`Jenkinsfile` uses the ECR repository name `todo-app` and tags each image with the Jenkins `BUILD_NUMBER`. The unique tag connects every ECS task definition revision to the Pipeline run that produced it.
 
-When the container is running in the foreground, use `Ctrl + C`.
+## Expected result
 
-If the container is running in detached mode:
+The Docker workflow is working when:
 
-- `docker stop <container_id>`
-
-## Docker image flow in Jenkins
-
-The Jenkins pipeline builds and publishes the image in two stages:
-
-- **Build App Image:** builds the Docker image from the repository Dockerfile.
-- **Upload App Image:** pushes the image to AWS ECR.
-
-## Image naming
-
-The current image name in `Jenkinsfile` points to AWS ECR:
-
-- `ECR_REPOSITORY = "todo-app"`
-
-Docker image is tagged with the Jenkins `BUILD_NUMBER`
-
-## Docker checks
-
-A successful Docker setup confirms that:
-
-- the application can be packaged into a runtime image;
-- the container exposes the application port;
-- the image can be used by AWS ECS after being pushed to ECR.
+- the JAR is packaged into the image;
+- the container starts and exposes port `8080`;
+- the application responds through the mapped local port;
+- Jenkins can use the same image structure for ECR and ECS.

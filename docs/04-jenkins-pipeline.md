@@ -1,164 +1,282 @@
 # Jenkins Pipeline
 
-## Purpose
-
-This document explains the CI/CD pipeline defined in `Jenkinsfile`.
-
-The pipeline automates the flow from source code checkout to AWS ECS deployment using a new task definition revision.
+The CI/CD workflow is defined in `Jenkinsfile`. It builds and analyzes the application, publishes a Docker image to AWS ECR, registers a new ECS task definition revision, and rolls the ECS service forward to that revision.
 
 ## Pipeline overview
 
-Fetch code → Maven verification → Checkstyle analysis → SonarQube analysis → Quality Gate → Maven package → Docker image build → Docker image push to ECR → ECS task definition revision registration → ECS service update → ECS service stability check
+```text
+Verify Agent → Fetch Code → Maven Verify → Checkstyle → SonarQube → Quality Gate → Package → Docker Build → ECR Push → ECS Deployment
+```
+
+## Execution model
+
+The Pipeline runs on a dedicated Jenkins Agent with this label:
+
+```text
+docker-aws-maven
+```
+
+The Jenkins Controller coordinates the job. The Jenkins Agent performs:
+
+- Maven builds and tests;
+- Checkstyle and SonarQube analysis;
+- Docker image build and push;
+- AWS CLI commands and ECS deployment.
+
+The Jenkins node label must exactly match the label in `Jenkinsfile`.
+
+## Required Jenkins plugins
+
+Install these plugins on the Jenkins Controller:
+
+- **Pipeline** — runs the declarative `Jenkinsfile`.
+- **Git** — checks out the repository.
+- **SSH Build Agents** — connects the Jenkins Controller to the Agent through SSH.
+- **SonarQube Scanner for Jenkins** — configures the scanner and Quality Gate integration.
+- **Docker Pipeline** — provides `docker.build` and `docker.withRegistry`.
+- **Amazon ECR** — authenticates Docker with AWS ECR.
+- **Pipeline: AWS Steps** — provides the `withAWS` Pipeline step.
+
+Required dependency plugins are installed automatically by Jenkins.
+
+The following plugins are not required by the current `Jenkinsfile`:
+
+- Pipeline: GitHub Groovy Libraries;
+- CloudBees Docker Build and Publish;
+- Build Timestamp;
+- Workspace Cleanup;
+- Amazon Web Services SDK :: All as a separately selected plugin.
 
 ## Jenkins tools
 
-The pipeline uses these Jenkins tool names:
+Open **Manage Jenkins → Tools** and configure these exact names:
 
-- **JDK:** `JDK21`
-- **Maven:** `MAVEN3.9`
-- **SonarQube scanner:** `sonar8.0`
+| Tool | Jenkins name | Agent installation |
+|---|---|---|
+| JDK | `JDK21` | `/usr/lib/jvm/java-21-openjdk-amd64` |
+| Maven | `MAVEN3.9` | `/opt/apache-maven-3.9.11` |
+| SonarQube Scanner | `sonar8.0` | Configure automatic installation in Jenkins |
 
-The tool names in Jenkins must match the values used in `Jenkinsfile`.
+The JDK and Maven paths are created on the Jenkins Agent by Ansible.
 
-## Jenkins agent
+If Jenkins is configured to install a tool automatically, the tool name must still match the value used in `Jenkinsfile`.
 
-The pipeline runs on a dedicated Jenkins agent with the label docker-aws-maven.
+## Jenkins Agent configuration
 
-The Jenkins controller is used for orchestration, while the agent performs Maven builds, code analysis, Docker image operations, AWS CLI commands, and ECS deployment.
+Create a permanent Jenkins node with:
 
-## Jenkins plugins
+- **Node name:** `jenkins-agent`;
+- **Remote root directory:** `/home/jenkins/agent`;
+- **Labels:** `docker-aws-maven`;
+- **Usage:** use this node as much as possible;
+- **Launch method:** `Launch agents via SSH`;
+- **Host:** Jenkins Agent private IP;
+- **Credentials:** SSH username `jenkins` with the EC2 private key;
+- **Host Key Verification Strategy:** `Known hosts file Verification Strategy`.
 
-The Jenkins pipeline requires plugins for Pipeline syntax, GitHub checkout, Maven integration, SonarQube analysis, Docker image build/push, AWS authentication and ECS deployment commands.
+The Jenkins Controller must contain the Agent host key in:
 
-Installed plugins for this setup:
+```text
+/var/lib/jenkins/.ssh/known_hosts
+```
 
-- **Pipeline** — core Pipeline functionality for running the `Jenkinsfile`.
-- **Pipeline Maven Integration Plugin** — Maven build support inside Jenkins Pipeline.
-- **GitHub Branch Source Plugin** — GitHub repository and branch integration.
-- **Pipeline: GitHub Groovy Libraries** — GitHub-based shared library support for Pipeline jobs.
-- **SonarQube Scanner for Jenkins** — SonarQube scanner configuration and Quality Gate integration.
-- **Amazon ECR plugin** — AWS ECR authentication support for Docker image push.
-- **Pipeline: AWS Steps** — AWS-related Pipeline steps and credential handling.
-- **Amazon Web Services SDK :: All** — AWS SDK dependencies used by AWS-related Jenkins plugins.
-- **Docker Pipeline** — Docker commands and image operations inside Jenkins Pipeline.
-- **CloudBees Docker Build and Publish plugin** — Docker image build and publish support.
-- **Build Timestamp Plugin** — build timestamp variables for logs and build metadata.
-- **Workspace Cleanup Plugin** — workspace cleanup before or after pipeline runs.
+The complete node and `known_hosts` setup is documented in `docs/07-terraform-ansible.md`.
 
-These plugins support the current pipeline stages from GitHub checkout to Docker image delivery and AWS ECS deployment.
+## Required credentials
 
-## Jenkins integrations
+### Jenkins Agent SSH key
 
-- **SonarQube server:** `sonarserver`
-- **AWS credentials ID:** `awscreds`
-- **Docker registry credentials:** configured for AWS ECR push
-- **Docker CLI:** available on the Jenkins agent
-- **AWS CLI:** available on the Jenkins agent
+Create an **SSH Username with private key** credential:
 
-## Repository checkout
+- **Username:** `jenkins`;
+- **Private key:** the private key of the EC2 key pair used by Terraform;
+- **Suggested ID:** `jenkins-agent-ssh`.
 
-The `Fetch code` stage clones the repository from GitHub.
+### SonarQube token
 
-Current repository URL:
+Create a **Secret text** credential:
 
-- `git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'`
+- **Secret:** token generated in SonarQube;
+- **ID:** `sonar-token`.
+
+### AWS credentials
+
+Create an **AWS Credentials** credential:
+
+- **ID:** `awscreds`;
+- **Access Key ID:** access key for the Jenkins IAM user;
+- **Secret Access Key:** secret key for the Jenkins IAM user.
+
+The ID must be exactly `awscreds` because `Jenkinsfile` uses it directly and through:
+
+```groovy
+registryCredential = 'ecr:us-east-1:awscreds'
+```
+
+The required IAM policy is documented in `docs/05-aws-ecr-ecs.md`.
+
+## SonarQube integration
+
+Open **Manage Jenkins → System → SonarQube servers** and configure:
+
+- **Name:** `sonarserver`;
+- **Server URL:** `http://SONARQUBE_PRIVATE_IP:9000`;
+- **Server authentication token:** `sonar-token`.
+
+The server name must exactly match:
+
+```groovy
+withSonarQubeEnv('sonarserver')
+```
+
+In SonarQube, create this webhook:
+
+```text
+http://JENKINS_CONTROLLER_PRIVATE_IP:8080/sonarqube-webhook/
+```
+
+SonarQube sends the Quality Gate result to the Jenkins Controller. The Jenkins Agent starts the analysis, but it does not receive the webhook.
+
+## Pipeline job
+
+Create a Jenkins **Pipeline** job and select **Pipeline script from SCM**.
+
+Use:
+
+- **SCM:** Git;
+- **Repository URL:** `https://github.com/yaromacarano/CICD-todoApp.git`;
+- **Branch Specifier:** `*/main`;
+- **Script Path:** `Jenkinsfile`.
+
+The repository is public, so Git credentials are not required for checkout.
+
+## Pipeline trigger
+
+The current `Jenkinsfile` does not contain a `triggers` block.
+
+The Terraform Security Group allows access to Jenkins port `8080` only from the administrator CIDR and internal project Security Groups. GitHub cannot currently reach the Jenkins webhook endpoint.
+
+Start the Pipeline manually with **Build Now**.
+
+To enable builds on every push, add a Jenkins trigger and expose the webhook endpoint through an appropriately secured public route. Until then, **Build Now** is the intended entry point.
 
 ## Environment values
 
-The pipeline uses these AWS and deployment values from the `environment` block:
+The `environment` block in `Jenkinsfile` uses:
 
-- `AWS_REGION = 'us-east-1'`
-- `ECR_REGISTRY = '551647579168.dkr.ecr.us-east-1.amazonaws.com'`
-- `ECR_REPOSITORY = 'todo-app'`
-- `ECS_CLUSTER = 'newcluster'`
-- `ECS_SERVICE = 'todo-ecs-service'`
-- `ECS_TASK_FAMILY = 'todo-task'`
-- `CONTAINER_NAME = 'todo'`
+| Variable | Value |
+|---|---|
+| `AWS_REGION` | `us-east-1` |
+| `ECR_REGISTRY` | `551647579168.dkr.ecr.us-east-1.amazonaws.com` |
+| `ECR_REPOSITORY` | `todo-app` |
+| `ECS_CLUSTER` | `newcluster` |
+| `ECS_SERVICE` | `todo-ecs-service` |
+| `ECS_TASK_FAMILY` | `todo-task` |
+| `CONTAINER_NAME` | `todo` |
+
+`IMAGE_TAG` uses the Jenkins build number. `IMAGE_URI` is built from the registry, repository, and build number.
+
+If Terraform is deployed in another AWS account, update `ECR_REGISTRY` in `Jenkinsfile` and `executionRoleArn` in `aws/task-definition-template.json`.
 
 ## Pipeline stages
 
 ### 1. VERIFY AGENT
 
-Checks that the Jenkins agent has the required tools installed: Java, Maven, Git, Docker, and AWS CLI.
+Checks that Java, Maven, Git, Docker, and AWS CLI are available on the Jenkins Agent.
 
 ### 2. Fetch code
 
-Clones the source code from GitHub.
+Clones the `main` branch from:
 
-This stage confirms that Jenkins can access the repository and branch.
+```text
+https://github.com/yaromacarano/CICD-todoApp.git
+```
 
 ### 3. UNIT TEST
 
-Runs Maven verification:
+Runs:
 
-- `mvn clean verify`
+```bash
+mvn clean verify
+```
 
-This stage checks that the project can be compiled and verified through Maven.
+This compiles the project, runs tests, and performs Maven verification.
 
 ### 4. Checkstyle Analysis
 
-Runs Checkstyle analysis through Maven.
+Runs:
 
-The stage produces a style/static analysis report for the Java codebase.
+```bash
+mvn checkstyle:checkstyle
+```
+
+The generated report is later passed to SonarQube.
 
 ### 5. Sonar Code Analysis
 
-Runs SonarQube analysis with the configured SonarQube scanner and server.
+Uses the Jenkins tool `sonar8.0` and the SonarQube server `sonarserver`.
 
-This stage sends code quality data to SonarQube.
+The project key is:
+
+```text
+todo-sonar
+```
 
 ### 6. Quality Gate
 
-Waits for the SonarQube Quality Gate result.
+Waits up to one hour for the SonarQube webhook result.
 
-The pipeline continues only after the quality gate result is received.
+The Pipeline stops when the Quality Gate fails.
 
 ### 7. Build
 
-Builds the application artifact:
+Runs:
 
-- `mvn package -DskipTests`
+```bash
+mvn package -DskipTests
+```
 
-Application artifact:
+The generated artifact is:
 
-- `target/todolist-app-1.0.0.jar`
+```text
+target/todolist-app-1.0.0.jar
+```
+
+Jenkins archives the JAR after a successful build.
 
 ### 8. Build App Image
 
-Builds the Docker image using the repository `Dockerfile`.
+Builds this Docker image:
 
-The image is prepared for upload to AWS ECR.
+```text
+551647579168.dkr.ecr.us-east-1.amazonaws.com/todo-app:BUILD_NUMBER
+```
 
 ### 9. Upload App Image
 
-Authenticates to AWS ECR and pushes the Docker image.
-
-This stage confirms that Jenkins has valid AWS and Docker registry access.
+Uses the Amazon ECR plugin and the `awscreds` credential to authenticate and push the image.
 
 ### 10. Deploy to ECS
 
-Triggers a new deployment of the configured ECS service:
+Runs `scripts/deploy-ecs.sh` inside `withAWS`.
 
-- Jenkins builds `IMAGE_URI` from `ECR_REPOSITORY` and `BUILD_NUMBER`;
-- Jenkins replaces `IMAGE_URI_PLACEHOLDER` in aws/task-definition-template.json;
-- Jenkins creates task-definition.json;
-- Jenkins registers a new ECS task definition revision;
-- Jenkins updates ECS service to the new revision;
-- Jenkins waits until ECS service is stable.
+The script:
 
-This makes ECS start a new deployment cycle for the service.
+1. replaces `IMAGE_URI_PLACEHOLDER` in `aws/task-definition-template.json`;
+2. creates the temporary `task-definition.json` file;
+3. registers a new `todo-task` revision;
+4. updates `todo-ecs-service`;
+5. waits until the ECS service becomes stable.
 
-## Successful pipeline result
+## Expected outcome
 
-A successful pipeline run confirms that:
+After a successful run:
 
-- Jenkins can clone the repository;
-- Maven verification passes;
-- static analysis stages run;
-- SonarQube Quality Gate is checked;
-- the application JAR is built;
-- Docker image build succeeds;
-- the image is pushed to AWS ECR;
-- ECS task definition revision registration;
-- ECS service update;
-- ECS service stability check.
+- the Jenkins Agent is connected and has the required tools;
+- Maven verification and Checkstyle complete successfully;
+- SonarQube returns an accepted Quality Gate result;
+- the application JAR and Docker image are created;
+- the image is pushed to ECR;
+- a new task definition revision is registered;
+- the ECS service is updated and becomes stable;
+- the application can be opened through the Application Load Balancer URL.

@@ -67,6 +67,7 @@ app.log*
 # Temporary files
 *.tmp
 *.temp
+task-definition.json
 
 # Terraform
 .terraform/
@@ -82,4 +83,3 @@ tfplan
 ansible/inventory/hosts.ini
 *.retry
 *.pem
-

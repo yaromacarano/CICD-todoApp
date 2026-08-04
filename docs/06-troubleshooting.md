@@ -1,224 +1,353 @@
 # Troubleshooting
 
-## Purpose
+This guide covers the most common problems that may appear during the build and deployment process.
 
-This document contains checks for common issues in the local build, Docker image build, Jenkins pipeline, SonarQube analysis, AWS ECR push, and AWS ECS deployment trigger.
+When a Jenkins Pipeline fails, start by opening the failed stage and reading the last lines of its log. They usually show which component needs to be checked.
 
 ## Maven build fails
 
-### Check Java version
+Check the Java version:
 
-Command:
+```bash
+java -version
+```
 
-- `java -version`
+The project requires Java 21.
 
-The project uses Java 21.
+Check Maven:
 
-### Check Maven version
+```bash
+mvn -version
+```
 
-Command:
+The project uses Maven 3.9 or newer.
 
-- `mvn -version`
+Run the build manually from the project root:
 
-Maven 3.9+ is used for the project build.
+```bash
+mvn clean verify
+```
 
-### Run clean verification
-
-Command:
-
-- `mvn clean verify`
-
-This helps confirm whether the issue is related to compilation, tests, or project configuration.
+If this command also fails, the problem is related to the application build rather than Jenkins.
 
 ## JAR file is missing
 
-The Docker build uses the application JAR from the `target/` directory.
+The Dockerfile expects this file:
 
-Build the artifact first:
+```text
+target/todolist-app-1.0.0.jar
+```
 
-- `mvn clean package`
+Create it from the project root:
 
-Application artifact:
+```bash
+mvn clean package
+```
 
-- `target/todolist-app-1.0.0.jar`
+Then check that the file exists:
+
+```bash
+ls -l target/todolist-app-1.0.0.jar
+```
 
 ## Docker image build fails
 
-### Check Docker
+Check that Docker is running:
 
-Command:
+```bash
+docker version
+```
 
-- `docker version`
+Check that the JAR file exists:
 
-### Check artifact path
+```bash
+ls -l target/todolist-app-1.0.0.jar
+```
 
-Confirm that the JAR referenced by the `Dockerfile` exists in `target/`.
+Try to build the image manually:
 
-### Build image manually
+```bash
+docker build -t todo-app:v1.0 .
+```
 
-Command:
+If Jenkins reports a Docker permission error, make sure the `jenkins` user belongs to the `docker` group. Restart the Jenkins Agent after changing the group membership.
 
-- `docker build -t todo-app:v1.0 .`
+## Container starts but the application is unavailable
 
-## Container starts but application is not available
+Check whether the container is running:
 
-### Check container status
+```bash
+docker ps
+```
 
-Command:
+Read its logs:
 
-- `docker ps`
+```bash
+docker logs CONTAINER_ID
+```
 
-### Check logs
+The application listens on port `8080`. Run it locally with:
 
-Command:
+```bash
+docker run --rm -p 8080:8080 todo-app:v1.0
+```
 
-- `docker logs <container_id>`
+Then open:
 
-### Check port mapping
+```text
+http://localhost:8080
+```
 
-The application runs on port `8080`:
+## Local run fails because the data directory is missing
 
-- `docker run --rm -p 8080:8080 todo-app:v1.0`
+The application expects a `data/` directory in the project root.
+
+Create it if it is missing:
+
+```bash
+mkdir -p data
+```
+
+## Terraform reports that a resource already exists
+
+This usually means that a resource with the same name is already present in AWS.
+
+Open the AWS Console and find the resource named in the Terraform error. If it belongs to an older deployment and is no longer needed, delete it and run Terraform again:
+
+```bash
+cd terraform
+terraform apply
+```
+
+Do not delete a resource if it contains important data or is used by another project. In that case, it should be imported into Terraform state instead.
+
+Remember that `terraform destroy` removes only the resources tracked in the current Terraform state. Resources created manually are not removed automatically.
+
+## Terraform cannot delete the ECR repository
+
+Terraform cannot delete the `todo-app` repository while it contains Docker images.
+
+Delete the images through the AWS Console:
+
+1. Open **Amazon ECR**.
+2. Open **Private repositories**.
+3. Select `todo-app`.
+4. Select all images and choose **Delete**.
+5. Run `terraform destroy` again.
+
+## Ansible cannot connect to a server
+
+Run Ansible from the Ansible Controller:
+
+```bash
+cd ~/CICD-todoApp/ansible
+ansible all -m ping
+```
+
+If a server is unreachable, check that:
+
+- the EC2 instance is running;
+- `inventory/hosts.ini` contains the correct private IP addresses;
+- `~/.ssh/todo-app-key.pem` exists on the Ansible Controller;
+- the SSH key has permission `600`;
+- the remote user is `ubuntu`;
+- the Security Group allows SSH from the Ansible Controller.
+
+Set the correct key permission with:
+
+```bash
+chmod 600 ~/.ssh/todo-app-key.pem
+```
+
+## Ansible variable is undefined
+
+Run Ansible commands from the repository `ansible/` directory:
+
+```bash
+cd ~/CICD-todoApp/ansible
+ansible-playbook playbooks/site.yml
+```
+
+This allows Ansible to load `ansible.cfg` and the files inside `group_vars/`.
+
+If the error remains, check the variable name for spelling mistakes and make sure the required file exists in `group_vars/`.
 
 ## Jenkins cannot find Java or Maven
 
-Check Jenkins Global Tool Configuration.
+Open **Manage Jenkins → Tools** and check these names:
 
-Expected tool names:
+- JDK: `JDK21`;
+- Maven: `MAVEN3.9`.
 
-- `JDK21`
-- `MAVEN3.9`
+The names must exactly match the values used in `Jenkinsfile`.
 
-The names must match the values used in `Jenkinsfile`.
+You can also check the tools directly on the Jenkins Agent:
 
-## Jenkins cannot clone repository
+```bash
+java -version
+mvn -version
+```
 
-Check the `Fetch code` stage.
+## Jenkins cannot connect to the SSH Agent
 
-Expected repository URL:
+Open the Jenkins node configuration:
 
-- `git branch: 'main', url: 'https://github.com/yaromacarano/CICD-todoApp.git'`
+1. Go to **Manage Jenkins → Nodes**.
+2. Open the Jenkins Agent node.
+3. Select **Configure**.
+4. Make sure **Launch method** is set to `Launch agents via SSH`.
+5. Under **Host Key Verification Strategy**, select `Manually trusted key Verification Strategy`.
+6. Save the configuration.
+7. Open the node again and select **Relaunch agent**.
+8. Confirm the Agent host key when Jenkins asks whether it should be trusted.
 
-Also check:
+This strategy allows Jenkins to save the Agent host key during the first successful connection. It is also useful after the Agent EC2 instance is recreated and receives a new host key.
 
-- repository visibility;
-- branch name;
-- Jenkins network access to GitHub;
-- Git installation on the Jenkins agent.
+If the connection still fails, check that:
+
+- the host is the Jenkins Agent private IP;
+- the SSH username is `jenkins`;
+- the correct SSH private key is selected in **Credentials**;
+- the remote root directory is `/home/jenkins/agent`;
+- port `22` is allowed from the Jenkins Controller Security Group.
+
+## Jenkins cannot clone the repository
+
+The Pipeline uses:
+
+```text
+https://github.com/yaromacarano/CICD-todoApp.git
+```
+
+Check that:
+
+- the repository address is correct;
+- the selected branch is `main`;
+- Git is installed on the Jenkins Agent;
+- the Jenkins Agent has internet access.
 
 ## SonarQube analysis fails
 
-Check Jenkins SonarQube configuration.
+Open **Manage Jenkins → System → SonarQube servers** and check:
 
-Configured values:
+- server name: `sonarserver`;
+- server URL uses the SonarQube private IP and port `9000`;
+- the selected SonarQube token is valid.
 
-- **SonarQube server:** `sonarserver`
-- **SonarQube scanner:** `sonar8.0`
+Then open **Manage Jenkins → Tools** and check that the SonarQube Scanner name is `sonar8.0`.
 
-Also check:
+If SonarQube itself is unavailable, connect to its EC2 instance and check the service:
 
-- SonarQube server is running;
-- Jenkins can reach the SonarQube URL;
-- SonarQube token is valid;
-- project key and scanner configuration are correct.
+```bash
+sudo systemctl status sonarqube
+```
+
+## Jenkins Agent cannot reach SonarQube
+
+The SonarQube Security Group must allow TCP port `9000` from the Jenkins Agent Security Group.
+
+Check the connection from the Jenkins Agent:
+
+```bash
+curl http://SONARQUBE_PRIVATE_IP:9000/api/system/status
+```
+
+If the command cannot connect, check the SonarQube private IP, the EC2 instance state, and the Security Group rule.
 
 ## Quality Gate stage is stuck
 
-Check SonarQube webhook configuration.
+SonarQube must send the analysis result back to the Jenkins Controller.
 
-The Jenkins Quality Gate step requires SonarQube to send the result back to Jenkins.
+Open **SonarQube → Administration → Configuration → Webhooks** and check this address:
 
-Check:
+```text
+http://JENKINS_CONTROLLER_PRIVATE_IP:8080/sonarqube-webhook/
+```
 
-- SonarQube webhook URL;
-- Jenkins URL reachable from SonarQube;
-- SonarQube analysis completed successfully;
-- Quality Gate exists in SonarQube.
+Make sure that:
+
+- the address ends with `/`;
+- the Jenkins Controller private IP is correct;
+- the Jenkins Security Group allows port `8080` from the SonarQube Security Group;
+- the latest webhook delivery in SonarQube was successful.
 
 ## ECR push fails
 
-Check AWS credentials in Jenkins.
+Start with the failed Jenkins stage and read its log. Then check the following settings.
 
-Expected credentials ID:
+### 1. Check Jenkins credentials
 
-- `awscreds`
+Open **Manage Jenkins → Credentials**. The AWS credential must have:
 
-Check AWS CLI access from the Jenkins agent:
+- type: `AWS Credentials`;
+- ID: `awscreds`;
+- a valid Access Key ID and Secret Access Key.
 
-- `aws sts get-caller-identity`
+### 2. Check the ECR repository
 
-Check ECR login and repository access:
+Open **AWS Console → Amazon ECR → Private repositories** and make sure the `todo-app` repository exists in `us-east-1`.
 
-- `aws ecr describe-repositories --region us-east-1`
+### 3. Check IAM permissions
 
-Common causes:
+Open the IAM user used by Jenkins and check that it has permission to log in to ECR and push images.
 
-- invalid AWS credentials;
-- missing ECR permissions;
-- wrong AWS region;
-- ECR repository does not exist;
-- Docker is not authenticated to ECR.
+After correcting the setting, run the Jenkins Pipeline again.
 
 ## ECS deployment fails
 
+Open **AWS Console → Amazon ECS → Clusters → newcluster → Services → todo-ecs-service**.
+
+The **Events** tab usually explains why the deployment failed. Check the newest message first.
+
+Also check that:
+
+- the `todo-app` image exists in ECR;
+- a new revision appears under **Task definitions → todo-task**;
+- Jenkins has permission to register a task definition and update the ECS service;
+- Jenkins can pass the `ecsTaskExecutionRole` to ECS;
+- the region is `us-east-1`.
+
+If no new task definition revision appears, the problem happened before ECS updated the service. Check the `Deploy to ECS` stage in Jenkins.
+
+## ECS task starts and then stops
+
+Open the ECS service and select the **Tasks** tab. Change the filter to **Stopped** and open the latest task.
+
 Check:
 
-- ECS cluster exists;
-- ECS service exists;
-- task definition template exists: `aws/task-definition-template.json`;
-- AWS region is correct;
-- placeholder exists: `IMAGE_URI_PLACEHOLDER`;
-- Jenkins has ecs:RegisterTaskDefinition;
-- Jenkins has ecs:UpdateService;
-- Jenkins has iam:PassRole;
-- ECS service networking is valid.
+- **Stopped reason**;
+- the container exit code;
+- the message under the container details.
 
-## Task definition registration fails
+Then open **CloudWatch → Log groups → `/ecs/todo-task`** and read the newest log stream.
 
-Common causes:
+Common causes include:
 
-- invalid JSON in `aws/task-definition-template.json`;
-- empty tags array;
-- missing iam:PassRole;
-- wrong execution role ARN;
-- invalid image URI;
-- missing ECR image tag.
+- the application failed to start;
+- the Docker image or tag does not exist in ECR;
+- ECS cannot pull the image;
+- the container does not listen on port `8080`;
+- the load balancer health check fails.
 
-## ECS task does not stay running
+## Application works but Todo data disappears
 
-Check ECS task logs and service events.
+SQLite data is stored inside the container at:
 
-Common causes:
+```text
+/app/data/TodoList.db
+```
 
-- application failed to start;
-- container port mismatch;
-- missing environment variables;
-- task has insufficient CPU or memory;
-- security group or load balancer configuration issue;
-- task definition image points to the wrong tag or repository.
+The current ECS configuration does not use persistent storage for this directory. When ECS replaces the task, the new container starts with an empty database.
+
+Keep `ecs_desired_count = 1`. If several tasks run at the same time, each task has its own separate database.
 
 ## Screenshot safety check
 
-Before committing screenshots to GitHub, hide:
+Before committing screenshots, make sure they do not show:
 
-- AWS access keys;
-- secret keys;
+- AWS access keys or secret keys;
+- SonarQube or Jenkins tokens;
 - passwords;
-- tokens;
-- private URLs if needed;
-- sensitive infrastructure details;
-- personal data.
-
-## Local run fails because data directory is missing
-
-The application expects a data/ directory in the project root during local execution.
-
-Check that the repository contains:
-
-- `data/.gitkeep`
-
-If the directory is missing, create it manually:
-
-- mkdir -p data
-
-Docker and ECS runs are not affected by this local issue because the Docker image creates the required directory during image build.
+- private SSH keys;
+- session cookies;
+- personal information.

@@ -1,147 +1,180 @@
-# CI/CD Todo App — DevOps Portfolio Project
+# CI/CD Todo App
 
-Java Spring Boot Todo application with a Jenkins CI/CD pipeline, Docker image build, SonarQube quality checks, AWS ECR image publishing, AWS ECS task definition revision deployment, and infrastructure automation with Terraform and Ansible.
+This repository contains a Java Spring Boot Todo application and the automation required to provision, configure, build, test, and deploy it on AWS.
 
-The application code is used as a base for demonstrating a practical DevOps workflow around build automation, containerization, quality control, and cloud deployment.
+Terraform manages the infrastructure, Ansible configures the EC2 hosts, and Jenkins carries the application from source code to a running ECS Fargate service. Docker, SonarQube, AWS ECR, an Application Load Balancer, and CloudWatch complete the delivery path.
 
 ## Architecture
 
-Terraform creates the AWS infrastructure. Ansible configures the EC2 servers. The application delivery flow remains:
+The project has three automation layers:
 
-GitHub Repository → Jenkins Controller → Jenkins Agent → AWS ECR → AWS ECS Service
+1. **Terraform** creates the AWS infrastructure.
+2. **Ansible** configures Jenkins Controller, Jenkins Agent, and SonarQube.
+3. **Jenkins** builds, checks, packages, and deploys the application.
 
-The pipeline performs these steps:
+Application delivery flow:
 
-1. Fetch source code from GitHub.
-2. Run Maven verification.
-3. Run Checkstyle analysis.
-4. Send code analysis to SonarQube.
-5. Validate the SonarQube Quality Gate.
-6. Package the Spring Boot application.
-7. Build a Docker image.
-8. Push the image to AWS ECR.
-9. Register a new ECS task definition revision and update the ECS service
+```text
+GitHub → Jenkins Controller → Jenkins Agent → Maven → Checkstyle → SonarQube → Docker → AWS ECR → AWS ECS Fargate → Application Load Balancer
+```
+
+The Jenkins pipeline performs these steps:
+
+1. Verifies the required tools on the Jenkins Agent.
+2. Fetches the source code from GitHub.
+3. Runs Maven verification.
+4. Runs Checkstyle analysis.
+5. Sends code analysis to SonarQube.
+6. Waits for the SonarQube Quality Gate.
+7. Packages the Spring Boot application.
+8. Builds a Docker image.
+9. Pushes the image to AWS ECR.
+10. Registers a new ECS task definition revision.
+11. Updates the ECS service and waits until it becomes stable.
 
 ## Tech stack
 
 - **Application:** Java 21, Spring Boot
-- **Build:** Maven
+- **Build:** Maven 3.9
 - **CI/CD:** Jenkins Pipeline
 - **Code quality:** Checkstyle, SonarQube Quality Gate
 - **Containerization:** Docker
 - **Cloud registry:** AWS ECR
-- **Cloud runtime:** AWS ECS
-- **Infrastructure:** Terraform
+- **Cloud runtime:** AWS ECS Fargate
+- **Load balancing:** AWS Application Load Balancer
+- **Infrastructure as Code:** Terraform
 - **Server configuration:** Ansible
+- **Logging:** AWS CloudWatch Logs
 - **Version control:** Git, GitHub
 
-### Jenkins agent-based execution
+## Jenkins agent-based execution
 
-The Jenkins pipeline runs on a dedicated Jenkins agent with the label `docker-aws-maven`.
+The pipeline runs on a dedicated Jenkins Agent with the label `docker-aws-maven`.
 
-The Jenkins controller is used only for orchestration, while the agent performs the actual CI/CD work:
+The Jenkins Controller manages jobs and coordinates the pipeline. The Jenkins Agent performs the actual CI/CD work:
 
-- Maven build and tests
-- Checkstyle and SonarQube analysis
-- Docker image build and push to ECR
-- ECS deployment
+- Maven build and tests;
+- Checkstyle and SonarQube analysis;
+- Docker image build and push to ECR;
+- ECS task definition registration and service deployment.
 
-This keeps the Jenkins controller clean and makes the setup closer to a production-like CI/CD environment.
+This keeps build tools and Docker operations away from the Jenkins Controller.
 
 ## Repository structure
 
-- `src/` — Spring Boot application source code
-- `Dockerfile` — Docker image definition
-- `Jenkinsfile` — Jenkins CI/CD pipeline
-- `data/` — keeps the required local data directory available when running the app outside Docker
-- `pom.xml` — Maven project configuration
-- `.gitignore` — ignored local and build files
-- `README.md` — main project overview
-- `scripts/` — helper scripts used by the CI/CD pipeline
-- `scripts/deploy-ecs.sh` — ECS deployment script used by Jenkins to render the task definition, register a new ECS task definition revision, update the ECS service, and wait until the service becomes stable
-- `docs/` — technical documentation
-- `aws/` — AWS deployment templates
-- `aws/task-definition-template.json` — ECS task definition template used by Jenkins during deployment
-- `docs/screenshots/` — screenshots used as visual proof of the pipeline and deployment result
-- `terraform/` — Terraform root module for the current AWS infrastructure
-- `ansible/` — inventory, variables, and playbooks for the EC2 servers
+- `src/` — Spring Boot application source code and tests.
+- `data/` — keeps the local application data directory in Git through `.gitkeep`.
+- `Dockerfile` — Docker image definition.
+- `.dockerignore` — limits the Docker build context to the Dockerfile and application JAR.
+- `Jenkinsfile` — Jenkins CI/CD pipeline.
+- `pom.xml` — Maven project configuration.
+- `aws/` — AWS deployment templates.
+- `aws/task-definition-template.json` — ECS task definition template used by Jenkins.
+- `scripts/deploy-ecs.sh` — registers a new task definition revision and updates the ECS service.
+- `terraform/` — Terraform configuration for the AWS infrastructure.
+- `ansible/` — Ansible inventory, variables, and playbooks for EC2 configuration.
+- `docs/` — project documentation.
+- `docs/screenshots/` — screenshots from documented releases and successful deployments.
 
 ## Run locally
 
 Prerequisites:
 
-- Java 21
-- Maven 3.9+
-- Git
-
-The application expects a data directory in the project root during local execution. The repository keeps this directory with data/.gitkeep.
+- Java 21;
+- Maven 3.9 or newer;
+- Git.
 
 Clone the repository:
 
-- `git clone https://github.com/yaromacarano/CICD-todoApp.git`
-- `cd CICD-todoApp`
+```bash
+git clone https://github.com/yaromacarano/CICD-todoApp.git
+cd CICD-todoApp
+```
 
 Run Maven verification:
 
-- `mvn clean verify`
+```bash
+mvn clean verify
+```
 
 Start the application:
 
-- `mvn spring-boot:run`
+```bash
+mvn spring-boot:run
+```
 
-Application URL:
+Open:
 
-- `http://localhost:8080`
+```text
+http://localhost:8080
+```
 
-More local build details are documented in `docs/02-local-run.md`.
+The application expects the `data/` directory in the project root. The repository keeps this directory through `data/.gitkeep`.
 
-## Docker
+More details are available in `docs/02-local-run.md`.
+
+## Run with Docker
 
 Build the application artifact:
 
-- `mvn clean package -DskipTests`
+```bash
+mvn clean package -DskipTests
+```
 
 Build the Docker image:
 
-- `docker build -t todo-app:v1.0 .`
+```bash
+docker build -t todo-app:v1.0 .
+```
 
 Run the container:
 
-- `docker run --rm -p 8080:8080 todo-app:v1.0`
+```bash
+docker run --rm -p 8080:8080 todo-app:v1.0
+```
 
-More Docker details are documented in `docs/03-docker.md`.
+More details are available in `docs/03-docker.md`.
 
-## Screenshots and proof
+## Deploy the complete environment
 
-Screenshots are stored in `docs/screenshots/` and cover the main proof points of the project:
+The complete deployment sequence is documented in `docs/07-terraform-ansible.md`.
 
-- GitHub repository structure;
-- successful Jenkins pipeline run;
-- Jenkins stage view;
-- SonarQube Quality Gate;
-- Docker image in AWS ECR;
-- AWS ECS service deployment;
-- running ECS task;
-- application running from the ECS deployment endpoint;
-- new ECS task definition revision after deployment.
+In short:
 
-Screenshot naming and content are documented in `docs/screenshots/v1.1-ecs-task-revision-deployment`.
+1. Run Terraform locally to create the AWS resources.
+2. Use the Ansible Controller to configure the EC2 servers.
+3. Finish the Jenkins, SonarQube, and credentials configuration.
+4. Start the Jenkins Pipeline manually with **Build Now**.
+
+The current version does not configure an automatic GitHub webhook trigger.
+
+## Project screenshots
+
+Screenshots are grouped by project version inside `docs/screenshots/`.
+
+The repository currently includes screenshots for:
+
+- `v1.0-devops-foundation`;
+- `v1.1-ecs-task-revision-deployment`.
 
 ## Documentation
 
-Detailed notes are kept in the `docs/` directory:
+- `docs/01-project-overview.md` — project purpose, architecture, and workflow.
+- `docs/02-local-run.md` — local build and run instructions.
+- `docs/03-docker.md` — Docker image build and container run instructions.
+- `docs/04-jenkins-pipeline.md` — Jenkins tools, plugins, integrations, credentials, and pipeline stages.
+- `docs/05-aws-ecr-ecs.md` — AWS architecture, IAM permissions, ECR, ECS, and ALB deployment details.
+- `docs/06-troubleshooting.md` — common Terraform, Ansible, Jenkins, SonarQube, Docker, ECR, and ECS issues.
+- `docs/07-terraform-ansible.md` — complete infrastructure and configuration instructions.
 
-- `docs/01-project-overview.md` — project purpose, architecture, and DevOps workflow.
-- `docs/02-local-run.md` — local build and application run instructions.
-- `docs/03-docker.md` — Docker image build and container run notes.
-- `docs/04-jenkins-pipeline.md` — Jenkins stages, tools, integrations, and environment values.
-- `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
-- `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, Jenkins, SonarQube, ECR, and ECS.
-- `docs/07-terraform-ansible.md` — Terraform and Ansible deployment instructions.
-- `docs/screenshots/v1.1-ecs-task-revision-deployment` — screenshot list used as visual proof of pipeline and deployment results.
+## Data persistence
+
+The application stores SQLite data inside the container at `/app/data/TodoList.db`. The current ECS task definition does not attach persistent storage, so replacing a task also replaces its database.
+
+Keep `ecs_desired_count = 1` with this design. Running multiple tasks would create a separate SQLite database for each task.
 
 ## Security
 
-Secrets are not stored in this repository. Jenkins credentials and AWS access keys are managed outside the codebase through Jenkins Credentials and AWS IAM.
+Secrets are not stored in this repository. AWS access keys, the EC2 private key, SonarQube tokens, and passwords must be managed outside Git through Jenkins Credentials, AWS IAM, and local protected files.
 
-Screenshots committed to the repository must not expose tokens, passwords, access keys, or private infrastructure details.
+Before committing screenshots, make sure that they do not expose access keys, tokens, passwords, private keys, or other sensitive information.
