@@ -76,6 +76,7 @@ app.log*
 terraform.tfvars
 crash.log
 crash.*.log
+tfplan
 
 # Ansible
 ansible/inventory/hosts.ini

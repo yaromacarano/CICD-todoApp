@@ -25,7 +25,7 @@ variable "key_name" {
 variable "admin_cidr" {
   description = "Your public IP address in CIDR notation, for example 203.0.113.10/32."
   type        = string
-  default     = "213.55.246.99/32"
+  default     = "203.0.113.10/32"
 
   validation {
     condition     = can(cidrhost(var.admin_cidr, 0)) && !strcontains(var.admin_cidr, ":")
