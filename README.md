@@ -155,7 +155,8 @@ Screenshots are grouped by project version inside `docs/screenshots/`.
 The repository currently includes screenshots for:
 
 - `v1.0-devops-foundation`;
-- `v1.1-ecs-task-revision-deployment`.
+- `v1.1-ecs-task-revision-deployment`;
+- `v1.3-terraform-ansible-integration`.
 
 ## Documentation
 
