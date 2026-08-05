@@ -33,7 +33,7 @@
     }
   ],
   "family": "todo-task",
-  "executionRoleArn": "arn:aws:iam::551647579168:role/ecsTaskExecutionRole",
+  "executionRoleArn": "ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "volumes": [],
   "placementConstraints": [],

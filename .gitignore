@@ -67,3 +67,19 @@ app.log*
 # Temporary files
 *.tmp
 *.temp
+task-definition.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+crash.log
+crash.*.log
+tfplan
+
+# Ansible
+ansible/inventory/hosts.ini
+*.retry
+*.pem
