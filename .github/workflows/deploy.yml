@@ -32,30 +32,18 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run Unit Tests
-        run: mvn clean verify
-
-      - name: Checkstyle Analysis
-        run: mvn checkstyle:checkstyle
-
-      - name: Build application
-        run: mvn package -DskipTests
-
-      - name: Sonar Code Analysis
-        uses: SonarSource/sonarqube-scan-action@v6
-        with:
-          args: >
-            -Dsonar.projectKey=todo-sonar
-            -Dsonar.projectName=todo-sonar
-            -Dsonar.projectVersion=1.0
-            -Dsonar.sources=src/
-            -Dsonar.java.binaries=target/classes/
-            -Dsonar.junit.reportPath=target/surefire-reports/
-            -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
-            -Dsonar.qualitygate.wait=true
+      - name: Build, Test, Checkstyle and SonarQube Cloud Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          mvn clean verify \
+            checkstyle:checkstyle \
+            org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }} \
+            -Dsonar.junit.reportPaths=target/surefire-reports \
+            -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
+            -Dsonar.qualitygate.wait=true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
