@@ -2,136 +2,140 @@
 
 ## Purpose
 
-This document describes the AWS part of the GitHub Actions CI/CD workflow.
+Terraform creates the AWS resources used by the application. GitHub Actions publishes each new Docker image to Amazon ECR and updates the Amazon ECS service to run it.
 
-AWS ECR stores the Docker image built by GitHub Actions. AWS ECS runs the containerized application through an ECS service.
+The infrastructure and application deployment have different owners:
 
-## AWS services used
-
-- **AWS ECR:** stores the Docker image.
-- **AWS ECS:** runs the application container.
-- **AWS IAM:** provides permissions for GitHub Actions to access AWS resources.
-- **AWS CloudWatch Logs:** stores logs from the ECS task.
-
-## Deployment flow
-
-GitHub Actions builds the Docker image, authenticates to AWS ECR, pushes the image, renders a new ECS task definition, and deploys it to the ECS service.
-
-Deployment flow:
-
-1. GitHub Actions configures AWS credentials.
-2. The workflow logs in to AWS ECR.
-3. The Docker image is built from the repository `Dockerfile`.
-4. The image is tagged with the GitHub Actions run number.
-5. The image is pushed to AWS ECR.
-6. The workflow renders `aws/task-definition-template.json` with the new image.
-7. AWS ECS receives a new task definition revision.
-8. The ECS service is updated to use the new task definition.
-9. The workflow waits until the ECS service becomes stable.
-
-## ECR configuration
-
-The ECR repository name is stored in GitHub Actions Variable:
-
-- `ECR_REPOSITORY`
-
-The AWS region is stored in GitHub Actions Variable:
-
-- `AWS_REGION`
-
-The final image URI is created during the workflow from:
-
-- ECR registry returned by the ECR login action;
-- ECR repository variable;
-- GitHub Actions run number.
-
-Image format:
-
-- `IMAGE_TAG="${{ github.run_number }}"`
-
-## ECS configuration
-
-The workflow deploys to ECS using these GitHub Actions Variables:
-
-- `CLUSTER` — ECS cluster name.
-- `SERVICE` — ECS service name.
-- `CONTAINER_NAME` — container name inside the ECS task definition.
-
-The ECS task definition template is stored in:
-
-- `aws/task-definition-template.json`
-
-## ECS task definition template
-
-The task definition template contains the runtime configuration for the ECS task:
-
-- task family;
-- container name;
-- container port mapping;
-- CPU and memory;
-- Fargate compatibility;
-- CloudWatch logs configuration;
-- ECS execution role;
-- container image field.
-
-During deployment, GitHub Actions renders the template and replaces the container image with the new ECR image.
+| Responsibility | Tool |
+| --- | --- |
+| Create ECR, ECS, ALB, security groups, IAM execution role, and logs | Terraform |
+| Build and push an application image | GitHub Actions |
+| Register a new task definition revision | GitHub Actions |
+| Update the ECS service to the new revision | GitHub Actions |
 
 ## AWS resources
 
-The AWS environment contains:
+| Resource | Current name or configuration |
+| --- | --- |
+| Region | `us-east-1` |
+| ECR repository | `todo-app` |
+| ECS cluster | `newcluster` |
+| ECS service | `todo-ecs-service` |
+| Task definition family | `todo-task` |
+| Container | `todo` on port `8080` |
+| Launch type | Fargate |
+| CloudWatch log group | `/ecs/todo-task` |
+| Load balancer | `todo-ELB` on port `80` |
+| Target group | `todo-target-group` on port `8080` |
+| ECS task execution role | `ecsTaskExecutionRole` |
 
-- ECR repository for the application image;
-- ECS cluster;
-- ECS service;
-- ECS task definition configured for Fargate;
-- networking configuration required by the ECS service;
-- IAM permissions for GitHub Actions;
-- CloudWatch log group for ECS task logs.
+## Network flow
 
-## GitHub Actions AWS access
+```text
+Internet → ALB port 80 → ECS task port 8080
+```
 
-GitHub Actions uses AWS credentials stored in GitHub Actions Secrets.
+The load balancer security group accepts public HTTP traffic. The ECS security group accepts port `8080` only from the load balancer security group.
 
-Required secrets:
+The ECS task receives a public IP because the configuration uses the default VPC without a NAT gateway. Users still access the application through the load balancer.
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+## Image publishing
 
-The workflow does not store AWS access keys in the repository.
+The workflow builds the image after the build and Quality Gate pass.
 
-## IAM permission areas
+The image tag is the GitHub Actions run number:
 
-The AWS IAM user or role used by GitHub Actions needs access to these AWS API areas:
+```text
+AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/todo-app:GITHUB_RUN_NUMBER
+```
 
-- `ecr:GetAuthorizationToken`
-- `ecr:BatchCheckLayerAvailability`
-- `ecr:InitiateLayerUpload`
-- `ecr:UploadLayerPart`
-- `ecr:CompleteLayerUpload`
-- `ecr:PutImage`
-- `ecs:RegisterTaskDefinition`
-- `ecs:DescribeTaskDefinition`
-- `ecs:UpdateService`
-- `ecs:DescribeServices`
-- `iam:PassRole`
+This provides a direct connection between a workflow run and the image it deployed.
 
-`iam:PassRole` is required because ECS task definitions use an execution role.
+To verify a push in the AWS Console:
 
-## Deployment verification
+1. Open **Amazon ECR**.
+2. Open the `todo-app` repository.
+3. Confirm that a new image tag matches the GitHub Actions run number.
 
-After a successful GitHub Actions run, the AWS console shows:
+## Task definition deployment
 
-- a new image in ECR with a tag based on the GitHub Actions run number;
-- a new ECS task definition revision;
-- ECS service deployment activity;
-- running ECS task;
-- ECS service using the latest task definition revision;
-- application available through the configured ECS endpoint or load balancer.
+The repository contains `aws/task-definition-template.json`. The workflow replaces its image placeholder with the new ECR image and registers a new revision of `todo-task`.
 
-## Security notes
+The template defines:
 
-AWS credentials are not stored in the repository.
+- Fargate compatibility;
+- Linux on x86-64;
+- `1024` CPU units;
+- `3072` MiB of memory;
+- container port `8080`;
+- the `ecsTaskExecutionRole` execution role;
+- CloudWatch Logs configuration.
 
-Sensitive values such as access keys, secret keys, tokens, and passwords are managed outside the repository through GitHub Actions Secrets and AWS IAM.
+After registering the revision, GitHub Actions updates `todo-ecs-service` and waits for the service to become stable.
 
-Screenshots must not expose AWS access keys, secret values, tokens, or private infrastructure details.
+## Load balancer health
+
+The target group checks the application root path `/`. Status codes from `200` through `399` are considered healthy.
+
+To verify deployment in the AWS Console:
+
+1. Open **Amazon ECS** and select `newcluster`.
+2. Open `todo-ecs-service`.
+3. Check that one task is running.
+4. Open the **Deployments** or **Events** section and confirm that the latest deployment completed.
+5. Open the target group and confirm that the task target is healthy.
+6. Open the Terraform `application_url` output in a browser.
+
+## CloudWatch logs
+
+Application logs are sent to:
+
+```text
+/ecs/todo-task
+```
+
+If a task stops or the target becomes unhealthy, open the latest log stream in CloudWatch Logs before changing the infrastructure.
+
+## AWS access used by GitHub Actions
+
+Terraform creates the ECS task execution role used by the running task. It does not create the IAM user or access keys used by GitHub Actions.
+
+The GitHub Actions AWS identity needs permission to:
+
+- authenticate and push images to ECR;
+- register and describe ECS task definitions;
+- update and describe the ECS service;
+- pass `ecsTaskExecutionRole` to ECS.
+
+The exact permission list depends on whether the project uses an IAM user or role. AWS credentials are stored in GitHub Secrets and never in the repository.
+
+## Terraform and ECS revisions
+
+Terraform creates the initial ECS task definition and service. GitHub Actions then registers a new task definition revision on every deployment.
+
+The Terraform ECS service resource uses:
+
+```hcl
+lifecycle {
+  ignore_changes = [task_definition]
+}
+```
+
+Without this rule, a later `terraform apply` could change the service back to the original Terraform revision. Terraform continues to manage the service itself but leaves the deployed application revision under GitHub Actions control.
+
+## First-image behaviour
+
+The initial Terraform task definition points to the `latest` image in the new ECR repository. If the repository is empty, ECS may show a stopped task until the first GitHub Actions deployment pushes a real image and registers a new revision.
+
+For the first deployment:
+
+1. create the infrastructure with Terraform;
+2. configure the GitHub Secrets and Variables;
+3. run `Todo CI/CD WF` manually on `github-actions`;
+4. wait for the ECS deployment to become stable.
+
+## Cost considerations
+
+The main running costs come from the Application Load Balancer and the Fargate task. ECR also charges for stored images after any free allowance.
+
+When the environment is only needed temporarily, remove old images and run `terraform destroy` after the demonstration. See [Terraform Infrastructure](07-terraform.md) for the cleanup sequence.

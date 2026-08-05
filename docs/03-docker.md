@@ -2,97 +2,101 @@
 
 ## Purpose
 
-This document describes how the application is packaged and run as a Docker container.
+Docker packages the Spring Boot JAR into the same runtime image format used by GitHub Actions and Amazon ECS.
 
-Docker is used to create a consistent runtime image for the Spring Boot application. The same image format is built by GitHub Actions before publishing to AWS ECR.
+The image is based on the Java 21 JRE, runs from `/app`, exposes port `8080`, and starts the application with:
 
-## Dockerfile role
+```text
+java -jar app.jar
+```
 
-The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 21.
+## Build the application
 
-The image build uses the JAR file from the `target/` directory.
+The Dockerfile expects this file:
 
----
+```text
+target/todolist-app-1.0.0.jar
+```
 
-The Docker image creates the required data/ directory during image build.
+Create it before building the image:
 
-The data/.gitkeep file is only used for local execution from the repository root. Docker and ECS use the directory created inside the image.
+```bash
+mvn clean package -DskipTests
+```
 
-## Build application artifact
+For a complete local check, omit `-DskipTests`.
 
-Command:
+## Build the image
 
-- `mvn clean package -DskipTests`
+```bash
+docker build -t todo-app:github-actions .
+```
 
-Expected artifact:
+The `.dockerignore` keeps the build context small. Only the Dockerfile and the required JAR are sent to Docker.
 
-- `target/todolist-app-1.0.0.jar`
+## Run the container
 
-## Build Docker image
+```bash
+docker run --rm -p 8080:8080 todo-app:github-actions
+```
 
-Command:
+Open `http://localhost:8080`.
 
-- `docker build -t todo-app:github-actions .`
+Stop the foreground container with `Ctrl+C`.
 
-## Check image
+## Run in the background
 
-Command:
+```bash
+docker run -d --name todo-app -p 8080:8080 todo-app:github-actions
+docker ps
+docker logs todo-app
+```
 
-- `docker images | grep todo-app`
+Stop and remove it when finished:
 
-## Run container
+```bash
+docker stop todo-app
+docker rm todo-app
+```
 
-Command:
+## Data directory
 
-- `docker run --rm -p 8080:8080 todo-app:github-actions`
+The Dockerfile creates `/app/data` for the SQLite database. The data remains inside the container and is removed with the container unless a volume is mounted.
 
-Application URL:
+The ECS deployment uses the same container behaviour. When ECS replaces the task, the SQLite data in the old task is not preserved.
 
-- `http://localhost:8080`
+## Image flow in GitHub Actions
 
-## Check running container
+The `deploy` job:
 
-Command:
+1. downloads the JAR produced by `build-test-scan`;
+2. logs Docker in to Amazon ECR;
+3. builds the image from the repository Dockerfile;
+4. tags it with `github.run_number`;
+5. pushes it to the `todo-app` ECR repository;
+6. inserts the complete image URI into a new ECS task definition revision.
 
-- `docker ps`
+The final image name has this format:
 
-## Stop container
+```text
+AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/todo-app:GITHUB_RUN_NUMBER
+```
 
-When the container is running in the foreground, use `Ctrl + C`.
+Using the workflow run number makes it possible to match an ECR image with the GitHub Actions run that created it.
 
-If the container is running in detached mode:
+## Common checks
 
-- `docker stop <container_id>`
+If the build fails, confirm that the JAR exists:
 
-## Docker image flow in GitHub Actions
+```bash
+ls -l target/todolist-app-1.0.0.jar
+```
 
-The GitHub Actions workflow builds and publishes the image after the Maven and SonarQube stages pass.
+If the container starts but the page does not open, check its status and logs:
 
-Image flow:
+```bash
+docker ps -a
+docker logs todo-app
+```
 
-- GitHub Actions logs in to AWS ECR.
-- The workflow builds the Docker image from the repository `Dockerfile`.
-- The image is tagged with the GitHub Actions run number.
-- The image is pushed to AWS ECR.
-- The pushed image is used in the ECS task definition deployment.
-
-## Image naming
-
-The workflow builds the image using these values:
-
-- `ECR_REGISTRY` — returned by the AWS ECR login action.
-- `ECR_REPOSITORY` — loaded from GitHub Actions Variable `ECR_REPOSITORY`.
-- `IMAGE_TAG` — GitHub Actions run number from `github.run_number`.
-
-Final image format:
-
-- `ECR_REGISTRY/ECR_REPOSITORY:IMAGE_TAG`
-
-## Docker checks
-
-A successful Docker setup confirms that:
-
-- the application can be packaged into a runtime image;
-- the container exposes the application port;
-- the image can be pushed to AWS ECR;
-- the image can be used by AWS ECS after the task definition is rendered.
+Also confirm that host port `8080` is not already used by another application.

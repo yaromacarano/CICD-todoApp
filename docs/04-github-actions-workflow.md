@@ -2,217 +2,175 @@
 
 ## Purpose
 
-This document explains the CI/CD workflow defined in `.github/workflows/deploy.yml`.
+The workflow in `.github/workflows/deploy.yml` validates the application and deploys approved builds to Amazon ECS.
 
-The workflow automates the flow from source code checkout to AWS ECS deployment using GitHub Actions.
+It uses GitHub-hosted `ubuntu-latest` runners. Every job receives a new temporary runner, so the application artifact is transferred between jobs through GitHub Actions artifacts.
 
 ## Workflow overview
 
-Checkout code → Set up Java 21 → Maven verification → Checkstyle analysis → Maven package → SonarQube analysis → Artifact upload → Download artifact → AWS authentication → ECR image push → ECS task definition render → ECS deployment → Service stability check
+```text
+Checkout → Java 21 → Maven build, tests and Checkstyle → SonarQube Cloud
+         → Upload JAR → Download JAR → AWS authentication
+         → Docker image → ECR → ECS task definition → ECS deployment
+```
 
-## Workflow jobs
+## Triggers
 
-The workflow is split into two jobs:
+The workflow supports three events:
 
-### `build-test-scan`
+| Event | `build-test-scan` | `deploy` |
+| --- | --- | --- |
+| Push to `github-actions` | Runs | Runs |
+| Pull request to `github-actions` | Runs | Skipped |
+| `workflow_dispatch` on `github-actions` | Runs | Runs |
 
-This job validates the application before deployment. It runs on a GitHub-hosted runner and performs source checkout, Java setup, Maven verification, Checkstyle analysis, application packaging, SonarQube analysis, Quality Gate waiting, and artifact upload.
+The deployment condition is:
 
-### `deploy`
+```yaml
+if: github.ref == 'refs/heads/github-actions' && github.event_name != 'pull_request'
+```
 
-This job depends on `build-test-scan` and runs only after the validation job succeeds.
+This prevents pull requests from changing AWS resources. It also means that a manual run deploys when `github-actions` is selected.
 
-The deploy job runs only for direct pushes to the `github-actions` branch. It downloads the JAR artifact produced by the first job, configures AWS credentials, builds and pushes the Docker image to ECR, renders the ECS task definition, and deploys it to ECS.
+## Permissions and environment
 
-## Workflow triggers
+The workflow grants the GitHub token read-only repository access:
 
-The workflow runs on:
+```yaml
+permissions:
+  contents: read
+```
 
-- push to `github-actions`;
-- pull request to `github-actions`;
-- manual start through `workflow_dispatch`.
+The `deploy` job is assigned to the `production` GitHub environment. This makes it possible to add environment protection rules or keep deployment secrets at environment scope if required.
 
-Deployment to AWS runs only on direct pushes to the `github-actions` branch.
+## Job 1: `build-test-scan`
 
-Pull requests run the build and quality stages without deploying to AWS.
+This job validates the application before any AWS deployment.
 
-## GitHub Actions permissions
+### Checkout
 
-The workflow uses:
+`actions/checkout` downloads the repository. `fetch-depth: 0` provides the complete Git history required for accurate SonarQube Cloud analysis.
 
-- `contents: read`
+### Java setup
 
-This allows the workflow to read repository content during checkout.
+`actions/setup-java` installs Temurin Java 21 and enables the Maven dependency cache.
 
-## Runner
+### Build, test, Checkstyle, and analysis
 
-The workflow uses a GitHub-hosted runner:
+The current workflow runs one Maven command:
 
-- `ubuntu-latest`
+```bash
+mvn clean verify \
+  checkstyle:checkstyle \
+  org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
+  -Dsonar.organization=SONAR_ORGANIZATION \
+  -Dsonar.projectKey=SONAR_PROJECT_KEY \
+  -Dsonar.junit.reportPaths=target/surefire-reports \
+  -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
+  -Dsonar.qualitygate.wait=true
+```
 
-The runner is created fresh for every workflow run.
+The real organization and project keys are loaded from GitHub Variables. The authentication token is loaded from the `SONAR_TOKEN` secret.
 
-## Environment
+`sonar.qualitygate.wait=true` keeps the job running until SonarQube Cloud returns the Quality Gate result. If the gate fails, the job fails and deployment does not start.
 
-The `production` GitHub environment is used only by the `deploy` job.
+### Artifact upload
 
-This keeps deployment-related secrets and variables separated from the validation job. Pull requests run the build, test, Checkstyle, SonarQube, and artifact upload steps without accessing the production environment.
+The completed JAR is uploaded with:
 
-## GitHub Secrets
+| Setting | Value |
+| --- | --- |
+| Artifact name | `todolist-app-1.0.0` |
+| Source path | `target/*.jar` |
 
-The workflow uses GitHub Actions Secrets for sensitive values.
+## Job 2: `deploy`
 
-Required secrets:
+The second job has `needs: build-test-scan`, so it starts only after the validation job succeeds.
 
-- `AWS_ACCESS_KEY_ID` — AWS access key used by GitHub Actions.
-- `AWS_SECRET_ACCESS_KEY` — AWS secret key used by GitHub Actions.
-- `SONAR_TOKEN` — token used to authenticate with SonarQube.
-- `SONAR_HOST_URL` — public SonarQube URL used by the GitHub-hosted runner.
+### Artifact download
 
-Secrets are not stored in the repository.
+Because this job runs on a different runner, it downloads `todolist-app-1.0.0` into `target/`. The Dockerfile can then copy the JAR into the image.
 
-## GitHub Variables
+### AWS authentication
 
-The workflow uses GitHub Actions Variables for environment-specific values.
+`aws-actions/configure-aws-credentials` uses:
 
-Required variables:
+- `AWS_ACCESS_KEY_ID` from GitHub Secrets;
+- `AWS_SECRET_ACCESS_KEY` from GitHub Secrets;
+- `AWS_REGION` from GitHub Variables.
 
-- `AWS_REGION` — AWS region used for ECR and ECS.
-- `ECR_REPOSITORY` — ECR repository name.
-- `CONTAINER_NAME` — ECS container name used in the task definition.
-- `SERVICE` — ECS service name.
-- `CLUSTER` — ECS cluster name.
+The credentials belong to an AWS IAM identity with permission to push to ECR, register an ECS task definition, update the ECS service, and pass the ECS execution role.
 
-These values are configuration, not application code.
+### ECR image
 
-## Workflow steps
+The workflow logs in to ECR, builds the Docker image, and tags it with the workflow run number:
 
-### 1. Checkout code
+```text
+ECR_REGISTRY/ECR_REPOSITORY:GITHUB_RUN_NUMBER
+```
 
-Checks out the repository code on the GitHub-hosted runner.
+The complete image URI is saved as a step output for the next step.
 
-The workflow uses `fetch-depth: 0` so the full Git history is available for code analysis.
+### ECS task definition
 
-### 2. Setup JDK 21
+`aws-actions/amazon-ecs-render-task-definition` reads:
 
-Installs Java 21 using the Temurin distribution.
+```text
+aws/task-definition-template.json
+```
 
-The workflow also enables Maven dependency caching.
+It replaces `IMAGE_URI_PLACEHOLDER` for the container named by `CONTAINER_NAME`.
 
-### 3. Run Unit Tests
+### ECS deployment
 
-Runs Maven verification:
+`aws-actions/amazon-ecs-deploy-task-definition` registers the rendered task definition and updates:
 
-- `mvn clean verify`
+- the cluster from `CLUSTER`;
+- the service from `SERVICE`.
 
-This checks that the project can be compiled and verified through Maven.
+`wait-for-service-stability: true` keeps the job running until ECS reports that the deployment is stable.
 
-### 4. Checkstyle Analysis
+## Required GitHub settings
 
-Runs Checkstyle analysis through Maven:
+### Secrets
 
-- `mvn checkstyle:checkstyle`
+| Name | Used by |
+| --- | --- |
+| `SONAR_TOKEN` | SonarQube Cloud analysis |
+| `AWS_ACCESS_KEY_ID` | AWS deployment |
+| `AWS_SECRET_ACCESS_KEY` | AWS deployment |
 
-This creates the Checkstyle report used by the quality analysis step.
+### Variables
 
-### 5. Build application
+| Name | Purpose |
+| --- | --- |
+| `SONAR_ORGANIZATION` | SonarQube Cloud organization key |
+| `SONAR_PROJECT_KEY` | SonarQube Cloud project key |
+| `AWS_REGION` | Region containing ECR and ECS |
+| `ECR_REPOSITORY` | ECR repository name |
+| `CONTAINER_NAME` | Container name in the task definition |
+| `SERVICE` | ECS service name |
+| `CLUSTER` | ECS cluster name |
 
-Builds the application package without running tests again:
+The workflow does not use `SONAR_HOST_URL`. SonarQube Cloud is the analysis service, so no self-hosted SonarQube server or EC2 instance is required.
 
-- `mvn package -DskipTests`
+## Pull request note
 
-The build creates the application JAR in the `target/` directory.
+GitHub does not provide repository secrets to workflows created from untrusted forks. A pull request opened from a fork may therefore be unable to run the SonarQube Cloud step. This protects the secret from code controlled outside the repository.
 
-### 6. Sonar Code Analysis
+## Successful run
 
-Runs SonarQube analysis using the configured SonarQube token and server URL.
+A complete deployment confirms that:
 
-The analysis sends code quality data to SonarQube and waits for the Quality Gate result.
+- the project builds and tests on a clean runner;
+- Checkstyle and SonarQube Cloud analysis complete;
+- the Quality Gate passes;
+- the JAR is shared correctly between the two jobs;
+- the Docker image is pushed to ECR;
+- a new ECS task definition revision is registered;
+- the ECS service becomes stable with the new application image.
 
-Important values:
+## References
 
-- project key: `todo-sonar`
-- source directory: `src/`
-- Java binaries: `target/classes/`
-- Checkstyle report: `target/checkstyle-result.xml`
-- Quality Gate wait: enabled
-
-### 7. Upload artifact
-
-Uploads the built JAR as a GitHub Actions artifact.
-
-Artifact name:
-
-- `todolist-app-1.0.0`
-
-Artifact path:
-
-- `target/*.jar`
-
-### 8. Download artifact
-
-The `deploy` job downloads the JAR artifact produced by the `build-test-scan` job.
-
-Artifact name:
-
-- `todolist-app-1.0.0`
-
-Artifact download path:
-
-- `target`
-
-This is required because each GitHub Actions job runs on a fresh runner and does not automatically share the `target/` directory with other jobs.
-
-### 9. Configure AWS Credentials
-
-Configures AWS credentials for the deployment steps.
-
-This step runs only for direct pushes to `github-actions`, not for pull requests.
-
-### 10. Login to Amazon ECR
-
-Authenticates Docker to AWS ECR.
-
-The action returns the ECR registry URL used in the Docker image name.
-
-### 11. Build, tag and push image to ECR 
-
-Builds the Docker image from the repository `Dockerfile`. 
-
-The image is tagged with the GitHub Actions run number. 
-
-Example format: 
-
-- `${{ github.run_number }}`
-
-This makes the image easy to match with the GitHub Actions workflow run.
-
-### 12. Render ECS task definition
-
-Uses the ECS task definition template from:
-
-- `aws/task-definition-template.json`
-
-The workflow replaces the container image with the newly pushed ECR image.
-
-The container name is loaded from GitHub Actions Variable `CONTAINER_NAME`.
-
-### 13. Deploy ECS task definition
-
-Deploys the rendered ECS task definition to the configured ECS service and cluster.
-
-The deployment waits until the ECS service becomes stable.
-
-## Successful workflow result
-
-A successful workflow run confirms that:
-
-- GitHub Actions can check out the repository;
-- Java 21 and Maven build steps work on a clean runner;
-- Checkstyle analysis runs;
-- SonarQube analysis and Quality Gate pass;
-- the application JAR is built and uploaded as an artifact;
-- Docker image build succeeds;
-- the image is pushed to AWS ECR;
-- ECS receives a new task definition revision;
-- ECS service is updated and becomes stable.
+- [GitHub Actions workflow syntax](https://docs.github.com/actions/using-workflows/workflow-syntax-for-github-actions)
+- [SonarQube Cloud with GitHub Actions](https://docs.sonarsource.com/sonarqube-cloud/analyzing-source-code/ci-based-analysis/github-actions-for-sonarcloud)

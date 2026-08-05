@@ -1,147 +1,198 @@
-# CI/CD Todo App — GitHub Actions DevOps Portfolio Project
+# CI/CD Todo App — GitHub Actions
 
-Java Spring Boot Todo application with a GitHub Actions CI/CD workflow, Maven build, Checkstyle analysis, SonarQube quality checks, Docker image publishing to AWS ECR, and AWS ECS deployment through a new task definition revision.
+Java Spring Boot Todo application delivered to AWS through a GitHub Actions CI/CD workflow. Terraform creates the AWS infrastructure, while GitHub Actions builds and verifies the application, checks code quality in SonarQube Cloud, publishes a Docker image to Amazon ECR, and deploys it to Amazon ECS Fargate.
 
-This branch demonstrates the same DevOps delivery flow as the Jenkins version, but implemented with GitHub Actions as the CI/CD platform.
+This branch contains the GitHub Actions implementation of the project.
 
 ## Architecture
 
-GitHub Repository → GitHub Actions → Maven → Checkstyle → SonarQube → Docker → AWS ECR → AWS ECS
+The project separates infrastructure provisioning from application delivery.
 
-The workflow performs these steps:
+**Infrastructure:**
 
-1. Fetch source code from GitHub.
-2. Set up Java 21 on the GitHub-hosted runner.
-3. Run Maven verification.
-4. Run Checkstyle analysis.
-5. Build the Spring Boot application.
-6. Run SonarQube analysis and wait for the Quality Gate.
-7. Upload the build artifact.
-8. Download the build artifact in the deployment job.
-9. Configure AWS credentials.
-10. Build and push the Docker image to AWS ECR.
-11. Render a new ECS task definition with the new image.
-12. Deploy the ECS task definition to the ECS service.
-13. Wait until the ECS service becomes stable.
+```text
+Local workstation → Terraform → AWS infrastructure
+```
 
-## Tech stack
+**Application delivery:**
 
-- **Application:** Java 21, Spring Boot
-- **Build:** Maven
-- **CI/CD:** GitHub Actions
-- **Code quality:** Checkstyle, SonarQube Quality Gate
-- **Containerization:** Docker
-- **Cloud registry:** AWS ECR
-- **Cloud runtime:** AWS ECS Fargate
-- **Version control:** Git, GitHub
+```text
+GitHub → GitHub Actions → Maven and Checkstyle → SonarQube Cloud
+       → Docker → Amazon ECR → Amazon ECS Fargate → Application Load Balancer
+```
+
+Terraform is run manually when the infrastructure needs to be created or changed. It is not executed on every application push. Once the AWS resources exist, each push to `github-actions` can build and deploy a new application version.
+
+## Delivery flow
+
+1. A push or pull request starts the workflow.
+2. A GitHub-hosted runner checks out the repository and installs Java 21.
+3. Maven builds the application, runs the tests, and creates the Checkstyle report.
+4. SonarQube Cloud analyses the project and returns the Quality Gate result.
+5. The JAR is uploaded as a workflow artifact.
+6. For a deployment run, a second runner downloads the JAR and configures AWS access.
+7. The runner builds a Docker image and pushes it to Amazon ECR using the workflow run number as the image tag.
+8. GitHub Actions creates a new ECS task definition revision with the new image.
+9. The ECS service is updated and the workflow waits until it becomes stable.
+
+Pull requests run the validation job only. Deployment runs for pushes and manual workflow runs on the `github-actions` branch.
+
+## Technology stack
+
+|Area|Tools|
+|-|-|
+|Application|Java 21, Spring Boot, Maven|
+|CI/CD|GitHub Actions|
+|Code quality|Checkstyle, SonarQube Cloud Quality Gate|
+|Infrastructure as Code|Terraform|
+|Containers|Docker|
+|AWS|ECR, ECS Fargate, ALB, IAM, CloudWatch Logs|
+|Version control|Git, GitHub|
 
 ## Repository structure
 
-- `src/` — Spring Boot application source code
-- `.github/workflows/deploy.yml` — GitHub Actions CI/CD workflow
-- `data/` — keeps the required local data directory available when running the app outside Docker
-- `aws/task-definition-template.json` — ECS task definition template used during deployment
-- `Dockerfile` — Docker image definition
-- `pom.xml` — Maven project configuration
-- `README.md` — main project overview
-- `docs/` — technical documentation
-- `docs/screenshots/v2.1-github-actions-ecs-deployment` — screenshots used as visual proof of the workflow and deployment result
+|Path|Purpose|
+|-|-|
+|`.github/workflows/deploy.yml`|Build, quality checks, image publishing, and ECS deployment|
+|`terraform/`|AWS infrastructure managed by Terraform|
+|`aws/task-definition-template.json`|ECS task definition template rendered during deployment|
+|`Dockerfile`|Runtime image for the Spring Boot application|
+|`.dockerignore`|Limits the Docker build context to the required files|
+|`pom.xml`|Maven dependencies and build configuration|
+|`src/`|Application source code and tests|
+|`data/`|Local SQLite data directory placeholder|
+|`docs/`|Detailed project documentation|
 
-## Branch purpose
+## CI/CD implementations
 
-This branch is focused on the GitHub Actions implementation.
+|Branch|CI/CD platform|Infrastructure|
+|-|-|-|
+|`main`|Jenkins|Terraform and Ansible|
+|`github-actions`|GitHub Actions|Terraform|
+|`gitlab-ci`|GitLab CI|Terraform and Ansible|
 
-- `main` — Jenkins-based CI/CD implementation
-- `github-actions` — GitHub Actions-based CI/CD implementation
-
-The application and AWS deployment target remain the same. The CI/CD engine is different.
+The application and AWS deployment model are similar across the branches. The main difference is the CI/CD platform and the supporting automation required by it.
 
 ## Run locally
 
 Prerequisites:
 
-- Java 21
-- Maven 3.9+
-- Git
+* Java 21
+* Maven 3.9 or newer
+* Git
 
-The application expects a data directory in the project root during local execution. The repository keeps this directory with data/.gitkeep.
+Clone the repository and select this branch:
 
-Clone the repository:
+```bash
+git clone https://github.com/yaromacarano/CICD-todoApp.git
+cd CICD-todoApp
+git checkout github-actions
+```
 
-- `git clone https://github.com/yaromacarano/CICD-todoApp.git`
-- `cd CICD-todoApp`
-- `git checkout github-actions`
+Build and verify the application:
 
-Run Maven verification:
+```bash
+mvn clean verify
+```
 
-- `mvn clean verify`
+Start it locally:
 
-Start the application:
+```bash
+mvn spring-boot:run
+```
 
-- `mvn spring-boot:run`
+Open `http://localhost:8080`.
 
-Application URL:
+See [Local Run Guide](docs/02-local-run.md) for more detail.
 
-- `http://localhost:8080`
+## Run with Docker
 
-More local build details are documented in `docs/02-local-run.md`.
+Build the JAR and Docker image:
 
-## Docker
+```bash
+mvn clean package -DskipTests
+docker build -t todo-app:github-actions .
+```
 
-Build the application artifact:
+Start the container:
 
-- `mvn clean package -DskipTests`
+```bash
+docker run --rm -p 8080:8080 todo-app:github-actions
+```
 
-Build the Docker image:
+Open `http://localhost:8080`. See [Docker Guide](docs/03-docker.md) for more detail.
 
-- `docker build -t todo-app:github-actions .`
+## Create the AWS infrastructure
 
-Run the container:
+Terraform uses the AWS default VPC and creates the ECR repository, ECS Fargate service, Application Load Balancer, security groups, CloudWatch log group, and ECS task execution role.
 
-- `docker run --rm -p 8080:8080 todo-app:github-actions`
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+terraform apply
+```
 
-More Docker details are documented in `docs/03-docker.md`.
+Terraform is run separately from the application workflow. After the first `apply`, configure the required GitHub Secrets and Variables, then start the workflow manually from the Actions page. Later application changes deploy automatically on push.
 
-## GitHub Actions workflow
+See [Terraform Infrastructure](docs/07-terraform.md) for the complete setup and first-deployment sequence.
 
-The workflow is split into two jobs:
+## GitHub Actions configuration
 
-- `build-test-scan` — validates the application, runs quality checks, builds the JAR, and uploads it as an artifact.
-- `deploy` — downloads the JAR artifact, builds and pushes the Docker image, and deploys the new ECS task definition.
+Open:
 
-The `deploy` job depends on `build-test-scan` and runs only for direct pushes to the `github-actions` branch.
+```text
+Repository → Settings → Secrets and variables → Actions
+```
 
-## Screenshots and proof
+Required secrets:
 
-Screenshots are stored in `docs/screenshots/` and cover the main proof points of the project:
+|Secret|Purpose|
+|-|-|
+|`SONAR\_TOKEN`|Authenticates the Maven scanner with SonarQube Cloud|
+|`AWS\_ACCESS\_KEY\_ID`|Authenticates the deployment job with AWS|
+|`AWS\_SECRET\_ACCESS\_KEY`|Authenticates the deployment job with AWS|
 
-- GitHub Actions workflow file;
-- successful GitHub Actions workflow run;
-- workflow job steps;
-- SonarQube project and Quality Gate;
-- Docker image in AWS ECR;
-- ECS task definition revision created by the workflow;
-- ECS service updated to the new task definition revision;
-- application running from the ECS deployment endpoint.
+Required variables:
 
-Screenshot naming and content are documented in `docs/screenshots/`.
+|Variable|Current project value|
+|-|-|
+|`SONAR\_ORGANIZATION`|SonarQube Cloud organization key|
+|`SONAR\_PROJECT\_KEY`|SonarQube Cloud project key|
+|`AWS\_REGION`|`us-east-1`|
+|`ECR\_REPOSITORY`|`todo-app`|
+|`CONTAINER\_NAME`|`todo`|
+|`SERVICE`|`todo-ecs-service`|
+|`CLUSTER`|`newcluster`|
+
+`SONAR\_HOST\_URL` is not required because analysis uses SonarQube Cloud rather than a self-hosted SonarQube server.
+
+## Workflow triggers
+
+|Event|Validation|Deployment|
+|-|-|-|
+|Push to `github-actions`|Yes|Yes|
+|Pull request to `github-actions`|Yes|No|
+|Manual run on `github-actions`|Yes|Yes|
+
+Terraform does not send an event to GitHub after `terraform apply`. For the first deployment, create the infrastructure and then start `Todo CI/CD WF` manually. Once the environment exists, normal pushes are enough.
 
 ## Documentation
 
-Detailed notes are kept in the `docs/` directory:
-
-- `docs/01-project-overview.md` — project purpose, architecture, and DevOps workflow.
-- `docs/02-local-run.md` — local build and application run instructions.
-- `docs/03-docker.md` — Docker image build and container run notes.
-- `docs/04-github-actions-workflow.md` — GitHub Actions workflow, secrets, variables, and deployment stages.
-- `docs/05-aws-ecr-ecs.md` — AWS ECR and ECS deployment details.
-- `docs/06-troubleshooting.md` — common issues and checks for Maven, Docker, GitHub Actions, SonarQube, ECR, and ECS.
-- `docs/screenshots/` — screenshot list used as visual proof of workflow and deployment results.
+* [Project Overview](docs/01-project-overview.md)
+* [Local Run Guide](docs/02-local-run.md)
+* [Docker Guide](docs/03-docker.md)
+* [GitHub Actions Workflow](docs/04-github-actions-workflow.md)
+* [AWS ECR and ECS](docs/05-aws-ecr-ecs.md)
+* [Troubleshooting](docs/06-troubleshooting.md)
+* [Terraform Infrastructure](docs/07-terraform.md)
 
 ## Security
 
-Secrets are not stored in this repository. AWS access keys and SonarQube tokens are managed through GitHub Actions Secrets.
+Secrets and Terraform state are not committed to the repository. The `.gitignore` excludes `terraform.tfvars`, state files, plan files, credentials, and private keys.
 
-Environment-specific values such as AWS region, ECR repository name, ECS cluster, ECS service, and container name are managed through GitHub Actions Variables.
+Screenshots should be checked before committing so they do not expose tokens, credentials, account details, or other sensitive values.
 
-Screenshots committed to the repository must not expose tokens, passwords, access keys, or private infrastructure details.

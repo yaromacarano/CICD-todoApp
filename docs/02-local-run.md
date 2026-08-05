@@ -1,117 +1,90 @@
 # Local Run Guide
 
-## Purpose
-
-This document describes how to build and run the application on a local machine.
-
-Local execution checks the application before running the GitHub Actions workflow or building the Docker image.
-
 ## Prerequisites
 
 - Java 21
-- Maven 3.9+
+- Maven 3.9 or newer
 - Git
 
-Docker is only required for container testing. The application can be built and started without Docker.
+Docker is only needed for container testing. Terraform and AWS access are not required to run the application locally.
 
-## Clone repository
+## Clone the repository
 
-Run these commands:
+```bash
+git clone https://github.com/yaromacarano/CICD-todoApp.git
+cd CICD-todoApp
+git checkout github-actions
+```
 
-- `git clone https://github.com/yaromacarano/CICD-todoApp.git`
-- `cd CICD-todoApp`
-- `git checkout github-actions`
+## Verify the tools
 
-## Local data directory
+```bash
+java -version
+mvn -version
+```
 
-The application expects a data/ directory in the project root during local execution.
+The Java output should show major version `21`.
 
-The repository keeps this directory with:
+## Build and test
 
-- `data/.gitkeep`
+Run the same basic Maven verification used by the workflow:
 
-This makes local runs work from the repository root without creating the directory manually.
+```bash
+mvn clean verify
+```
 
-## Check Java
+This removes the previous build output, compiles the application, runs the configured tests, and creates the JAR in `target/`.
 
-Command:
+Expected artifact:
 
-- `java -version`
-
-Expected major version:
-
-- `21`
-
-## Check Maven
-
-Command:
-
-- `mvn -version`
-
-Expected Maven version:
-
-- `3.9.x` or newer
-
-## Run verification
-
-Command:
-
-- `mvn clean verify`
-
-This command performs the Maven verification flow:
-
-- removes previous build output;
-- compiles the project;
-- runs tests configured in the project;
-- verifies the Maven project state.
-
-## Build JAR
-
-Command:
-
-- `mvn clean package`
-
-The build artifact is created in:
-
-- `target/`
-
-The workflow uploads this artifact from:
-
-- `target/*.jar`
-
-The application artifact used in this project is:
-
-- `target/todolist-app-1.0.0.jar`
+```text
+target/todolist-app-1.0.0.jar
+```
 
 ## Run with Maven
 
-Command:
+```bash
+mvn spring-boot:run
+```
 
-- `mvn spring-boot:run`
+Open `http://localhost:8080`.
 
-Application URL:
+Stop the application with `Ctrl+C`.
 
-- `http://localhost:8080`
+## Run the packaged JAR
 
-## Run built JAR
+```bash
+mvn clean package
+java -jar target/todolist-app-1.0.0.jar
+```
 
-Command:
+Open `http://localhost:8080` and stop the application with `Ctrl+C`.
 
-- `java -jar target/todolist-app-1.0.0.jar`
+## Local database
 
-Application URL:
+The application uses SQLite and expects the `data/` directory in the repository root. The directory is retained in Git through:
 
-- `http://localhost:8080`
+```text
+data/.gitkeep
+```
 
-## Stop application
+The local database file is created in this directory and is excluded from Git.
 
-Use `Ctrl + C` in the terminal where the application is running.
+## Optional Checkstyle report
 
-## Local verification checklist
+The workflow creates a Checkstyle report before the SonarQube Cloud analysis. To reproduce that step locally, run:
 
-Local verification checks:
+```bash
+mvn checkstyle:checkstyle
+```
 
-- `java -version` shows Java 21;
-- `mvn clean verify` completes successfully;
-- `mvn clean package` creates the JAR file in `target/`;
-- the application starts on port `8080`.
+The report is generated under `target/`.
+
+## Quick verification
+
+A successful local check confirms that:
+
+- Java 21 and Maven are available;
+- `mvn clean verify` finishes successfully;
+- `target/todolist-app-1.0.0.jar` is created;
+- the application opens on port `8080`.
