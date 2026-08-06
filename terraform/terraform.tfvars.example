@@ -1,0 +1,8 @@
+aws_region = "us-east-1"
+key_name = "todo-app-key"
+admin_cidr = "203.0.113.10/32"
+
+gitlab_runner_instance_type      = "t3.medium"
+ansible_controller_instance_type = "t3.micro"
+
+ecs_desired_count = 1

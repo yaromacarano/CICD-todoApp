@@ -67,3 +67,26 @@ app.log*
 # Temporary files
 *.tmp
 *.temp
+
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+*.tfplan
+*.tfplan.*
+.terraform.tfstate.lock.info
+crash.log
+
+# Local environment variables and credentials
+.env
+.env.*
+
+# Ansible local files and secrets
+ansible/inventory/hosts.ini
+*.pem
+*.key
+
+# Generated AWS deployment file
+aws/task-definition.json

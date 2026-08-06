@@ -1,0 +1,9 @@
+[[runners]]
+  request_concurrency = 1
+
+  [runners.docker]
+    privileged = true
+    tls_verify = false
+    disable_cache = false
+    volumes = ["/certs/client", "/cache"]
+    shm_size = 0

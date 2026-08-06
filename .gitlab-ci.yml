@@ -10,14 +10,23 @@ default:
     - aws
     - docker
     - ec2
-    
+
 variables:
-  IMAGE_TAG: $CI_PIPELINE_IID
-  IMAGE_URI: $ECR_REGISTRY/$ECR_REPOSITORY:$CI_PIPELINE_IID
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  SONAR_USER_HOME: "$CI_PROJECT_DIR/.sonar"
+  GIT_DEPTH: "0"
+  SONAR_HOST_URL: "https://sonarcloud.io"
+  IMAGE_URI: "$ECR_REPOSITORY_URL:$CI_PIPELINE_IID"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .m2/repository/
+    - .sonar/cache/
 
 test-job:
   stage: test
-  image: maven:3.9.9-eclipse-temurin-17
+  image: maven:3.9.9-eclipse-temurin-21
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -25,84 +34,108 @@ test-job:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
   script:
-    - mvn test
-    - mvn checkstyle:checkstyle
+    - mvn --batch-mode --show-version clean test checkstyle:checkstyle
+  artifacts:
+    when: always
+    paths:
+      - target/classes/
+      - target/surefire-reports/
+      - target/checkstyle-result.xml
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
 
 build-job:
   stage: build
-  image: maven:3.9.9-eclipse-temurin-17
+  image: maven:3.9.9-eclipse-temurin-21
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - when: never
+  needs:
+    - job: test-job
+      artifacts: true
   script:
-    - mvn clean package -DskipTests
+    - mvn --batch-mode --show-version package -DskipTests
   artifacts:
     paths:
       - target/classes/
       - target/surefire-reports/
       - target/checkstyle-result.xml
       - target/todolist-app-1.0.0.jar
-    when: always
 
 sonarqube-check-job:
   stage: sonarqube-check
   image:
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
-  cache:
-    key: "${CI_JOB_NAME}"
-    paths:
-      - .sonar/cache
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - when: never
+  needs:
+    - job: build-job
+      artifacts: true
   script:
-    - |
-      sonar-scanner \
-        -Dsonar.projectKey=todo-sonar \
-        -Dsonar.projectName=todo-sonar \
-        -Dsonar.projectVersion=1.0 \
-        -Dsonar.sources=src/ \
-        -Dsonar.java.binaries=target/classes/ \
-        -Dsonar.junit.reportPaths=target/surefire-reports/ \
-        -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml \
-        -Dsonar.host.url=$SONAR_HOST_URL \
-        -Dsonar.token=$SONAR_TOKEN \
-        -Dsonar.qualitygate.wait=true
+    - >
+      sonar-scanner
+      -Dsonar.host.url="$SONAR_HOST_URL"
+      -Dsonar.token="$SONAR_TOKEN"
+      -Dsonar.organization="$SONAR_ORGANIZATION"
+      -Dsonar.projectKey="$SONAR_PROJECT_KEY"
+      -Dsonar.sources=src/main
+      -Dsonar.tests=src/test
+      -Dsonar.java.binaries=target/classes
+      -Dsonar.junit.reportPaths=target/surefire-reports
+      -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
+      -Dsonar.qualitygate.wait=true
 
 push-image-job:
   stage: push
-  image: alpine:3.20
+  image: docker:27.1.1-cli
   services:
-    - docker:27.1.1-dind
+    - name: docker:27.1.1-dind
+      alias: docker
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: "tcp://docker:2376"
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
+  needs:
+    - job: build-job
+      artifacts: true
+    - job: sonarqube-check-job
+      artifacts: false
   before_script:
-    - apk add --no-cache docker-cli aws-cli
-    - docker version
-    - aws --version
-    - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+    - apk update
+    - apk upgrade --no-cache
+    - apk add --no-cache aws-cli
+    - aws sts get-caller-identity
+    - export ECR_REGISTRY="${ECR_REPOSITORY_URL%/*}"
+    - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
   script:
-    - docker build -t $IMAGE_URI .
-    - docker push $IMAGE_URI
+    - docker build --tag "$IMAGE_URI" .
+    - docker push "$IMAGE_URI"
 
 deploy-ecs-job:
   stage: deploy
-  image: 
+  image:
     name: amazon/aws-cli:2.17.44
     entrypoint: [""]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
+  needs:
+    - push-image-job
   before_script:
-    - chmod +x scripts/deploy-ecs.sh
+    - aws sts get-caller-identity
   script:
+    - chmod +x ./scripts/deploy-ecs.sh
     - ./scripts/deploy-ecs.sh
+  environment:
+    name: production
+    url: "$APPLICATION_URL"

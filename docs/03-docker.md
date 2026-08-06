@@ -1,95 +1,36 @@
-# Docker Guide
+# Docker
 
-## Purpose
+## Build and run
 
-This document describes how the application is packaged and run as a Docker container.
+```bash
+mvn clean package -DskipTests
+docker build -t todo-app:gitlab-ci .
+docker run --rm -p 8080:8080 todo-app:gitlab-ci
+```
 
-Docker is used to create a consistent runtime image for the Spring Boot application. The same image format is used by the GitLab CI pipeline before publishing to AWS ECR.
+Open `http://localhost:8080` and stop the container with `Ctrl+C`.
 
-## Dockerfile role
+Useful checks:
 
-The repository contains a `Dockerfile` that runs the built Spring Boot JAR with Java 17.
+```bash
+docker images todo-app
+docker ps
+```
 
-The image build uses the JAR file from the `target/` directory.
+## Pipeline image
 
-The Docker image creates the required `data/` directory during image build. The `data/.gitkeep` file is only used for local execution from the repository root. Docker and ECS use the directory created inside the image.
+The `push-image-job` uses Docker-in-Docker with TLS and tags the image with the pipeline number:
 
-## Build application artifact
+```text
+$ECR_REPOSITORY_URL:$CI_PIPELINE_IID
+```
 
-Command:
+Flow:
 
-- `mvn clean package -DskipTests`
+1. Install AWS CLI in the job container.
+2. Authenticate to ECR.
+3. Build the image from the application JAR.
+4. Push the image to ECR.
+5. Deploy the same image URI to ECS.
 
-Expected artifact:
-
-- `target/todolist-app-1.0.0.jar`
-
-## Build Docker image
-
-Command:
-
-- `docker build -t todo-app:gitlab-ci .`
-
-## Check image
-
-Command:
-
-- `docker images | grep todo-app`
-
-## Run container
-
-Command:
-
-- `docker run --rm -p 8080:8080 todo-app:gitlab-ci`
-
-Application URL:
-
-- `http://localhost:8080`
-
-## Check running container
-
-Command:
-
-- `docker ps`
-
-## Stop container
-
-When the container is running in the foreground, use `Ctrl + C`.
-
-If the container is running in detached mode:
-
-- `docker stop <container_id>`
-
-## Docker image flow in GitLab CI
-
-The GitLab pipeline builds and publishes the image in the `push` stage.
-
-The image is tagged with:
-
-- `CI_PIPELINE_IID`
-
-Image format:
-
-- `$ECR_REGISTRY/$ECR_REPOSITORY:$CI_PIPELINE_IID`
-
-The same image tag is used during the ECS task definition revision deployment.
-
-## Docker-in-Docker
-
-The `push-image-job` uses Docker-in-Docker through the `docker:27.1.1-dind` service.
-
-The job installs:
-
-- `docker-cli`
-- `aws-cli`
-
-Then it authenticates to AWS ECR, builds the image, and pushes it to the configured ECR repository.
-
-## Docker checks
-
-A successful Docker setup confirms that:
-
-- the application can be packaged into a runtime image;
-- the container exposes the application port;
-- the image can be pushed to AWS ECR;
-- the image can be used by AWS ECS after deployment.
+The Runner configuration enables privileged mode and mounts `/certs/client` for Docker-in-Docker TLS.

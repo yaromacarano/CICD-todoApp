@@ -2,87 +2,43 @@
 
 ## Purpose
 
-This project documents a GitLab CI/CD workflow for a Java Spring Boot Todo application.
+This release adds infrastructure as code and automated Runner configuration to the GitLab CI version of the application.
 
-The application is used as a practical base for DevOps work: build automation, static checks, containerization, image publishing, and deployment to AWS ECS.
+## Workflow
 
-## Main workflow
+1. Terraform creates EC2, IAM, ECR, ECS, ALB and CloudWatch resources.
+2. Ansible installs Docker and GitLab Runner on EC2.
+3. GitLab Runner executes the pipeline with the Docker executor.
+4. Maven tests and builds the application.
+5. SonarQube Cloud checks the Quality Gate.
+6. GitLab CI pushes the image to ECR and updates ECS.
+7. ALB exposes the application.
 
-GitLab → GitLab CI → Maven → Checkstyle → SonarQube → Docker → AWS ECR → AWS ECS
+## Responsibilities
 
-The workflow covers:
+| Component | Responsibility |
+| --- | --- |
+| Terraform | AWS infrastructure and GitLab CI IAM user |
+| Ansible Controller | Runner configuration |
+| GitLab Runner | Pipeline execution |
+| SonarQube Cloud | Static analysis and Quality Gate |
+| ECR | Docker image storage |
+| ECS Fargate | Application runtime |
+| ALB | Public endpoint and health checks |
+| CloudWatch Logs | Container logs |
 
-1. Source code checkout by GitLab Runner.
-2. Maven test execution.
-3. Checkstyle analysis.
-4. Maven package build.
-5. SonarQube analysis.
-6. Quality Gate validation.
-7. Docker image build.
-8. Image push to AWS ECR.
-9. ECS task definition revision creation.
-10. ECS service update.
+## Security
 
-## Main components
+- GitLab CI uses a dedicated IAM user without Console access.
+- Its policy permits only ECR push, ECS deployment and passing the ECS execution role.
+- AWS keys and the SonarQube token are stored as masked GitLab variables.
+- `terraform.tfstate` is private because it contains the AWS Secret Key.
+- SSH is limited by security groups.
+- EC2 uses IMDSv2.
+- The Runner is assigned only to this project.
 
-- **Spring Boot application:** web application used as the deployment target.
-- **Maven:** build, verification, and packaging.
-- **Dockerfile:** runtime image definition for the application.
-- **GitLab CI:** CI/CD pipeline defined in `.gitlab-ci.yml`.
-- **Checkstyle:** Java style and static analysis report.
-- **SonarQube:** code quality analysis and Quality Gate.
-- **AWS ECR:** Docker image registry.
-- **AWS ECS:** runtime environment for the containerized application.
-- **ECS task definition template:** JSON template used to register new ECS revisions.
-- **Deployment script:** shell script used by the deploy job.
+Docker-in-Docker requires privileged mode. Do not use this Runner for untrusted projects or untagged jobs.
 
-## DevOps scope
+## First deployment
 
-The DevOps part of the repository covers:
-
-- Git-based source control;
-- GitLab CI/CD pipeline configuration;
-- Maven build lifecycle;
-- code quality checks before image publishing;
-- Docker image creation;
-- image publishing to AWS ECR;
-- ECS task definition revision deployment;
-- technical documentation for setup and troubleshooting.
-
-## Architecture
-
-The project follows a simple CI/CD architecture:
-
-1. Developer pushes code to the GitLab project.
-2. GitLab Runner executes the pipeline.
-3. Maven tests, Checkstyle, and package build run in containerized jobs.
-4. SonarQube analysis checks code quality.
-5. Docker-in-Docker builds and pushes the image to AWS ECR.
-6. The deploy job creates a new ECS task definition revision.
-7. ECS service is updated to use the latest task definition revision.
-
-## Repository files related to DevOps
-
-- `.gitlab-ci.yml` — defines the GitLab CI/CD pipeline.
-- `Dockerfile` — defines how the application image is built.
-- `aws/task-definition-template.json` — ECS task definition template used during deployment.
-- `scripts/deploy-ecs.sh` — deployment script used by the GitLab deploy job.
-- `data/.gitkeep` — keeps the local data directory in Git for application runs outside Docker.
-- `pom.xml` — defines Maven build, dependencies, and plugins.
-- `docs/` — contains technical documentation for the project.
-- `docs/screenshots/` — stores visual proof of pipeline and deployment results.
-
-## Portfolio value
-
-This branch shows practical experience with tools that are common in Junior DevOps and Cloud job descriptions:
-
-- Linux-based CI runners;
-- GitLab CI/CD pipeline automation;
-- Maven build process;
-- Docker image lifecycle;
-- Docker-in-Docker usage in CI;
-- SonarQube quality control;
-- AWS ECR and ECS deployment flow;
-- task definition revision deployment;
-- secure usage of CI/CD variables;
-- documentation of setup, assumptions, and troubleshooting.
+The initial ECS task may stop because the new ECR repository has no image. The first successful `main` pipeline pushes an image and updates the service.

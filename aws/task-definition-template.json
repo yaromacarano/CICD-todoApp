@@ -1,49 +1,41 @@
 {
+  "family": "TASK_FAMILY_PLACEHOLDER",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "3072",
+  "executionRoleArn": "TASK_EXECUTION_ROLE_ARN_PLACEHOLDER",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
   "containerDefinitions": [
     {
       "name": "todo",
       "image": "IMAGE_URI_PLACEHOLDER",
       "cpu": 0,
+      "essential": true,
       "portMappings": [
         {
+          "name": "todo-8080-tcp",
           "containerPort": 8080,
           "hostPort": 8080,
           "protocol": "tcp",
-          "name": "todo-8080-tcp",
           "appProtocol": "http"
         }
       ],
-      "essential": true,
       "environment": [],
-      "environmentFiles": [],
-      "mountPoints": [],
-      "volumesFrom": [],
-      "ulimits": [],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/todo-task",
-          "awslogs-create-group": "true",
-          "awslogs-region": "us-east-1",
+          "awslogs-group": "LOG_GROUP_PLACEHOLDER",
+          "awslogs-region": "AWS_REGION_PLACEHOLDER",
           "awslogs-stream-prefix": "ecs"
-        },
-        "secretOptions": []
-      },
-      "systemControls": []
+        }
+      }
     }
-  ],
-  "family": "todo-task",
-  "executionRoleArn": "arn:aws:iam::551647579168:role/ecsTaskExecutionRole",
-  "networkMode": "awsvpc",
-  "volumes": [],
-  "placementConstraints": [],
-  "runtimePlatform": {
-    "cpuArchitecture": "X86_64",
-    "operatingSystemFamily": "LINUX"
-  },
-  "requiresCompatibilities": [
-    "FARGATE"
-  ],
-  "cpu": "1024",
-  "memory": "3072"
+  ]
 }
+

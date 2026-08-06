@@ -1,0 +1,109 @@
+---
+- name: Configure the self-hosted GitLab Runner
+  hosts: gitlab_runners
+  become: true
+
+  tasks:
+    - name: Check that the Runner token was provided
+      ansible.builtin.assert:
+        that:
+          - gitlab_runner_token | length > 0
+          - gitlab_runner_token is match('^glrt-')
+        fail_msg: "Export GITLAB_RUNNER_TOKEN with the glrt- token before running Ansible."
+
+    - name: Update the apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages and Docker
+      ansible.builtin.apt:
+        name: "{{ common_packages + ['docker.io'] }}"
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Download the official GitLab Runner repository installer
+      ansible.builtin.get_url:
+        url: "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh"
+        dest: /tmp/install-gitlab-runner-repository.sh
+        mode: "0755"
+
+    - name: Add the official GitLab Runner repository
+      ansible.builtin.command:
+        cmd: bash /tmp/install-gitlab-runner-repository.sh
+        creates: /etc/apt/sources.list.d/runner_gitlab-runner.list
+
+    - name: Install GitLab Runner
+      ansible.builtin.apt:
+        name: gitlab-runner
+        state: present
+        update_cache: true
+
+    - name: Add the GitLab Runner user to the Docker group
+      ansible.builtin.user:
+        name: gitlab-runner
+        groups: docker
+        append: true
+      notify: Restart GitLab Runner
+
+    - name: Create the Docker executor configuration template
+      ansible.builtin.template:
+        src: ../templates/config.toml.j2
+        dest: /tmp/gitlab-runner-config.template.toml
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Check whether the Runner configuration contains a registration
+      ansible.builtin.command:
+        cmd: grep -q '^\[\[runners\]\]' /etc/gitlab-runner/config.toml
+      register: gitlab_runner_registration
+      changed_when: false
+      failed_when: false
+
+    - name: Register the Runner with the Docker executor
+      ansible.builtin.command:
+        argv:
+          - gitlab-runner
+          - register
+          - --non-interactive
+          - --url
+          - "{{ gitlab_url }}"
+          - --token
+          - "{{ gitlab_runner_token }}"
+          - --executor
+          - docker
+          - --docker-image
+          - "{{ gitlab_runner_default_image }}"
+          - --description
+          - "{{ gitlab_runner_name }}"
+          - --template-config
+          - /tmp/gitlab-runner-config.template.toml
+      when: gitlab_runner_registration.rc != 0
+      no_log: true
+      notify: Restart GitLab Runner
+
+    - name: Apply service changes now
+      ansible.builtin.meta: flush_handlers
+
+    - name: Start and enable GitLab Runner
+      ansible.builtin.service:
+        name: gitlab-runner
+        state: started
+        enabled: true
+
+    - name: Verify the connection to GitLab
+      ansible.builtin.command:
+        cmd: gitlab-runner verify --config /etc/gitlab-runner/config.toml
+      changed_when: false
+
+  handlers:
+    - name: Restart GitLab Runner
+      ansible.builtin.service:
+        name: gitlab-runner
+        state: restarted

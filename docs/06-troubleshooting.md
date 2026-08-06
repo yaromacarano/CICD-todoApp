@@ -1,261 +1,114 @@
 # Troubleshooting
 
-## Purpose
+## Terraform authentication
 
-This document contains checks for common issues in the local build, Docker image build, GitLab CI pipeline, SonarQube analysis, AWS ECR push, and AWS ECS deployment.
+```bash
+aws sts get-caller-identity
+```
 
-## GitLab job is stuck or not picked by runner
+Terraform uses local AWS credentials. The limited GitLab CI keys are created later by Terraform.
 
-The pipeline uses a self-hosted GitLab Runner hosted on AWS EC2.
+## Terraform subnet error
 
-Check that the runner is online and has the required tags:
+The ALB requires default subnets in at least two Availability Zones. Select a region with a default VPC and at least two default subnets.
 
-- `aws`
-- `docker`
-- `ec2`
+## Ansible connection
 
-Also check:
+Check the Runner private IP, SSH key path, key mode and security groups.
 
-- the runner is registered to the correct GitLab project;
-- the runner is active and not paused;
-- the `.gitlab-ci.yml` default tags match the runner tags;
-- the runner can execute Docker commands;
-- the runner has network access to AWS services;
-- the runner has network access to the SonarQube server.
+```bash
+chmod 400 ~/.ssh/todo-app-key.pem
+ansible all -m ping
+```
 
-## Maven build fails
+## Missing Runner token
 
-### Check Java version
+```bash
+read -s -p "GitLab Runner token: " GITLAB_RUNNER_TOKEN
+echo
+export GITLAB_RUNNER_TOKEN
+ansible-playbook playbooks/site.yml
+```
 
-Command:
+The token must start with `glrt-`.
 
-- `java -version`
+## Runner remains offline
 
-The project uses Java 17.
+```bash
+sudo systemctl status gitlab-runner
+sudo gitlab-runner verify --config /etc/gitlab-runner/config.toml
+sudo journalctl -u gitlab-runner -n 50 --no-pager
+```
 
-### Check Maven version
+If the first playbook run stopped before registration, check the configuration:
 
-Command:
+```bash
+sudo grep '^\[\[runners\]\]' /etc/gitlab-runner/config.toml
+```
 
-- `mvn -version`
+When no section is found, export the token again and rerun the playbook. The playbook retries registration even if an empty `config.toml` exists.
 
-Maven 3.9+ is used for the project build.
+Also verify the Runner tags `aws`, `docker`, `ec2`, project assignment and protected status in GitLab.
 
-### Run clean verification
+## Docker-in-Docker connection
 
-Command:
+`/etc/gitlab-runner/config.toml` must contain:
 
-- `mvn clean verify`
+```toml
+privileged = true
+volumes = ["/certs/client", "/cache"]
+```
 
-This helps confirm whether the issue is related to compilation, tests, or project configuration.
+Restart the Runner after a configuration change:
 
-## Local run fails because data directory is missing
+```bash
+sudo systemctl restart gitlab-runner
+```
 
-The application expects a `data/` directory in the project root during local execution.
-
-Check that the repository contains:
-
-- `data/.gitkeep`
-
-If the directory is missing, create it manually:
-
-- `mkdir -p data`
-
-Docker and ECS runs are not affected by this local issue because the Docker image creates the required directory during image build.
-
-## JAR file is missing
-
-The Docker build uses the application JAR from the `target/` directory.
-
-Build the artifact first:
-
-- `mvn clean package`
-
-Application artifact:
-
-- `target/todolist-app-1.0.0.jar`
-
-## Docker image build fails
-
-### Check Docker
-
-Command:
-
-- `docker version`
-
-### Check artifact path
-
-Confirm that the JAR referenced by the `Dockerfile` exists in `target/`.
-
-### Build image manually
-
-Command:
-
-- `docker build -t todo-app:gitlab-ci .`
-
-## Container starts but application is not available
-
-### Check container status
-
-Command:
-
-- `docker ps`
-
-### Check logs
-
-Command:
-
-- `docker logs <container_id>`
-
-### Check port mapping
-
-The application runs on port `8080`:
-
-- `docker run --rm -p 8080:8080 todo-app:gitlab-ci`
-
-## GitLab pipeline does not start
-
-Check `.gitlab-ci.yml` rules.
-
-Current validation jobs run for:
-
-- `main`;
-- `develop`;
-- merge request pipelines;
-- scheduled pipelines;
-- manual web pipelines.
-
-Current push and deploy jobs run only for:
-
-- `main`.
-
-If the pipeline is expected to run from another branch, update the job rules or run the project from the branch configured in the rules.
-
-## GitLab pipeline cannot access variables
-
-Check GitLab CI/CD variables:
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-- `ECR_REGISTRY`
-- `ECR_REPOSITORY`
-- `ECS_CLUSTER`
-- `ECS_SERVICE`
-- `ECS_TASK_FAMILY`
-- `SONAR_HOST_URL`
-- `SONAR_TOKEN`
-
-Also check whether variables are protected. Protected variables are available only for protected branches and tags.
-
-## SonarQube analysis fails
-
-Check GitLab CI/CD SonarQube variables:
-
-- `SONAR_HOST_URL`
-- `SONAR_TOKEN`
-
-Also check:
-
-- SonarQube server is running;
-- GitLab Runner can reach the SonarQube URL;
-- SonarQube token is valid;
-- project key and scanner configuration are correct;
-- `target/classes/` exists from the build job;
-- `target/checkstyle-result.xml` exists.
-
-## Quality Gate stage fails or times out
-
-The SonarQube scanner waits for the Quality Gate result.
+## SonarQube Cloud failure
 
 Check:
 
-- SonarQube server is reachable from GitLab Runner;
-- SonarQube analysis completed successfully;
-- Quality Gate exists in SonarQube;
-- project key is correct;
-- `SONAR_TOKEN` has enough permissions.
+- `SONAR_TOKEN`, `SONAR_ORGANIZATION` and `SONAR_PROJECT_KEY`;
+- access to variables from the current branch;
+- compiled classes, JUnit reports and Checkstyle report in job artifacts;
+- repository binding in SonarQube Cloud.
 
-## ECR push fails
+## InvalidClientTokenId or SignatureDoesNotMatch
 
-Check AWS variables in GitLab CI/CD settings.
+Check that:
 
-Check AWS CLI access from a local machine or runner:
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` match Terraform outputs;
+- values contain no quotes or spaces;
+- the variables are available to `main`.
 
-- `aws sts get-caller-identity`
+## AccessDenied
 
-Check ECR repository access:
+The job log must show the dedicated GitLab CI user:
 
-- `aws ecr describe-repositories --region us-east-1`
+```bash
+aws sts get-caller-identity
+```
 
-Common causes:
+Reapply Terraform if the user policy is missing:
 
-- invalid AWS credentials;
-- missing ECR permissions;
-- wrong AWS region;
-- ECR repository does not exist;
-- Docker-in-Docker service is not available;
-- Docker is not authenticated to ECR.
+```bash
+cd terraform
+terraform apply
+```
 
-## Docker-in-Docker fails
+`ECS_TASK_EXECUTION_ROLE_ARN` must contain the ECS execution role, not the GitLab IAM user ARN.
 
-The `push-image-job` uses:
+## AWS CLI failure in push-image-job
 
-- `docker:27.1.1-dind`
+Confirm that `apk update`, `apk upgrade --no-cache` and `apk add --no-cache aws-cli` completed successfully.
 
-Check:
+## ECR push failure
 
-- `DOCKER_HOST` is set to `tcp://docker:2375`;
-- `DOCKER_TLS_CERTDIR` is empty;
-- GitLab Runner allows Docker-in-Docker;
-- the runner has enough disk space.
+Check `ECR_REPOSITORY_URL`, `AWS_DEFAULT_REGION`, AWS identity and Docker-in-Docker status.
 
-## ECS task definition registration fails
+## ECS deployment failure
 
-Check:
+Compare ECS variables with `terraform output` and confirm that the current image tag exists in ECR.
 
-- `aws/task-definition-template.json` exists;
-- `IMAGE_URI_PLACEHOLDER` exists in the template;
-- generated file `aws/task-definition.json` is valid JSON;
-- ECS execution role ARN is correct;
-- GitLab AWS credentials have `ecs:RegisterTaskDefinition`;
-- GitLab AWS credentials have `iam:PassRole`;
-- image URI points to an existing ECR image tag.
-
-## ECS deployment fails
-
-Check:
-
-- ECS cluster exists;
-- ECS service exists;
-- `ECS_CLUSTER` variable is correct;
-- `ECS_SERVICE` variable is correct;
-- `ECS_TASK_FAMILY` variable is correct;
-- GitLab AWS credentials have `ecs:UpdateService`;
-- AWS region is correct;
-- ECS service has valid networking configuration.
-
-## ECS task does not stay running
-
-Check ECS task logs and service events.
-
-Common causes:
-
-- application failed to start;
-- container port mismatch;
-- missing environment variables;
-- task has insufficient CPU or memory;
-- security group or load balancer configuration issue;
-- task definition image points to the wrong tag or repository.
-
-## Screenshot safety check
-
-Before committing screenshots to GitHub, hide:
-
-- AWS access keys;
-- secret keys;
-- passwords;
-- tokens;
-- private URLs if needed;
-- sensitive infrastructure details;
-- personal data.
+If the service does not stabilize, check ECS service events and CloudWatch logs. Typical causes are an invalid image URI, wrong execution role, failed application startup or failed health checks on port `8080`.

@@ -1,133 +1,61 @@
-# AWS ECR and ECS
+# AWS Infrastructure and Deployment
 
-## Purpose
+## Resources
 
-This document describes the AWS part of the GitLab CI/CD workflow.
+Terraform creates:
 
-AWS ECR stores the Docker image built by GitLab CI. AWS ECS runs the containerized application through an ECS service.
+- GitLab Runner EC2 and Ansible Controller EC2;
+- security groups;
+- GitLab CI IAM user and access key;
+- GitLab deployment policy;
+- ECS task execution role;
+- ECR repository;
+- ECS cluster, task definition and service;
+- CloudWatch log group;
+- Application Load Balancer, listener and target group.
 
-## AWS services used
+The default VPC and its subnets are used.
 
-- **AWS ECR:** stores the Docker image.
-- **AWS ECS:** runs the application container.
-- **AWS IAM:** provides permissions for GitLab CI to access AWS resources.
-- **AWS CloudWatch Logs:** stores ECS container logs.
+## Networking
 
-## Deployment flow
+The Runner polls GitLab over outbound HTTPS. It does not require an inbound GitLab connection.
 
-GitLab CI builds the Docker image, authenticates to AWS ECR, pushes the image, creates a new ECS task definition revision, and updates the ECS service.
+SSH to the Runner is allowed from:
 
-The ECS service then starts a deployment with the updated task definition and runs a task using the new image.
+- `admin_cidr`;
+- the Ansible Controller security group.
 
-AWS deployment commands are executed from the self-hosted GitLab Runner hosted on AWS EC2. The runner is selected by the default tags in `.gitlab-ci.yml`: `aws`, `docker`, and `ec2`.
+No Docker daemon port is exposed.
 
-## ECR configuration
+## IAM
 
-The pipeline uses GitLab CI/CD variables for ECR configuration:
+The `<project-name>-gitlab-ci` user has no Console password. Its policy allows:
 
-- `ECR_REGISTRY` — ECR registry URL.
-- `ECR_REPOSITORY` — ECR repository name.
-- `IMAGE_TAG` — pipeline image tag based on `CI_PIPELINE_IID`.
-- `IMAGE_URI` — full Docker image URI used for build, push, and ECS deployment.
+- ECR authentication and image push;
+- ECS task registration and service update;
+- `iam:PassRole` for the project ECS execution role.
 
-Image format:
+It cannot manage the Terraform infrastructure. The keys remain valid until they are rotated or deleted.
 
-- `$ECR_REGISTRY/$ECR_REPOSITORY:$CI_PIPELINE_IID`
+## Deployment
 
-## ECS configuration
+Image URI:
 
-The pipeline uses GitLab CI/CD variables for ECS configuration:
+```text
+<account>.dkr.ecr.<region>.amazonaws.com/<repository>:<CI_PIPELINE_IID>
+```
 
-- `ECS_CLUSTER` — ECS cluster name.
-- `ECS_SERVICE` — ECS service name.
-- `ECS_TASK_FAMILY` — ECS task definition family name.
-- `AWS_DEFAULT_REGION` — AWS region used by the AWS CLI.
+The deployment script replaces the placeholders in `aws/task-definition-template.json`, creates `aws/task-definition.json`, registers a new revision and updates the service. The generated JSON file is ignored by Git.
 
-The deployment script registers a new task definition revision and updates the ECS service.
+Terraform ignores later changes to the ECS service task definition because GitLab CI owns application revisions.
 
-## ECS task definition template
+## Endpoint and cleanup
 
-The project stores the ECS task definition template in:
+The ALB listens on port `80` and forwards traffic to port `8080`. The public URL is returned as `application_url`.
 
-- `aws/task-definition-template.json`
+```bash
+cd terraform
+terraform destroy
+```
 
-The template contains:
-
-- task family;
-- container definition;
-- ECR image placeholder;
-- port mapping for port `8080`;
-- CloudWatch logs configuration;
-- execution role;
-- Fargate compatibility;
-- CPU and memory values.
-
-The image field uses:
-
-- `IMAGE_URI_PLACEHOLDER`
-
-During deployment, `scripts/deploy-ecs.sh` replaces this placeholder with the image URI from the current pipeline.
-
-Generated file:
-
-- `aws/task-definition.json`
-
-## Deployment script
-
-The deployment command is stored in:
-
-- `scripts/deploy-ecs.sh`
-
-The script performs these actions:
-
-1. Prepare ECS task definition from template.
-2. Register a new ECS task definition revision.
-3. Update the ECS service to use the configured task definition family.
-
-## GitLab AWS access
-
-GitLab CI uses AWS credentials stored as GitLab CI/CD variables.
-
-Required AWS variables:
-
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_DEFAULT_REGION`
-
-These values are not stored in the repository.
-
-## IAM permission areas
-
-The GitLab CI AWS user or role needs access to these AWS API areas:
-
-- `ecr:GetAuthorizationToken`
-- `ecr:BatchCheckLayerAvailability`
-- `ecr:InitiateLayerUpload`
-- `ecr:UploadLayerPart`
-- `ecr:CompleteLayerUpload`
-- `ecr:PutImage`
-- `ecs:RegisterTaskDefinition`
-- `ecs:UpdateService`
-- `ecs:DescribeServices`
-- `ecs:DescribeTaskDefinition`
-- `ecs:DescribeClusters`
-- `iam:PassRole`
-
-`iam:PassRole` is required because the ECS task definition uses an execution role.
-
-## Deployment verification
-
-After a successful GitLab CI run, the AWS console shows:
-
-- a new image tag in ECR;
-- a new ECS task definition revision;
-- ECS service deployment activity;
-- running ECS task;
-- task definition using the pushed ECR image;
-- application available through the configured ECS endpoint or load balancer.
-
-## Security notes
-
-AWS credentials are not stored in the repository.
-
-Sensitive values such as access keys, secret keys, tokens, passwords, AWS account details, and private infrastructure information are managed through GitLab CI/CD variables and AWS IAM.
+The ECR repository uses `force_delete = true`, so cleanup also removes stored images. Delete the AWS variables from GitLab after destroying the environment.

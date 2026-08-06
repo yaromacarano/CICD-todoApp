@@ -1,114 +1,44 @@
-# Local Run Guide
+# Local Run
 
-## Purpose
+## Requirements
 
-This document describes how to build and run the application on a local machine.
-
-Local execution is useful for checking the application before running the GitLab CI pipeline or building the Docker image.
-
-## Prerequisites
-
-- Java 17
+- Java 21
 - Maven 3.9+
 - Git
 
-Docker is only required for container testing. The application can be built and started without Docker.
+## Build and verify
 
-## Clone repository
+```bash
+git clone https://github.com/yaromacarano/CICD-todoApp.git
+cd CICD-todoApp
+git checkout gitlab-ci
 
-Run these commands:
+java -version
+mvn -version
+mvn clean verify
+mvn clean package
+```
 
-- `git clone https://github.com/yaromacarano/CICD-todoApp.git`
-- `cd CICD-todoApp`
-- `git checkout gitlab-ci`
+Build output:
 
-## Local data directory
+```text
+target/todolist-app-1.0.0.jar
+```
 
-The application expects a `data/` directory in the project root during local execution.
+## Run
 
-The repository keeps this directory with:
+With Maven:
 
-- `data/.gitkeep`
+```bash
+mvn spring-boot:run
+```
 
-This makes local runs work from the repository root without creating the directory manually.
+With the JAR:
 
-## Check Java
+```bash
+java -jar target/todolist-app-1.0.0.jar
+```
 
-Command:
+Open `http://localhost:8080`. Stop the application with `Ctrl+C`.
 
-- `java -version`
-
-Expected major version:
-
-- `17`
-
-## Check Maven
-
-Command:
-
-- `mvn -version`
-
-Expected Maven version:
-
-- `3.9.x` or newer
-
-## Run verification
-
-Command:
-
-- `mvn clean verify`
-
-This command performs the Maven verification flow:
-
-- removes previous build output;
-- compiles the project;
-- runs tests configured in the project;
-- verifies the Maven project state.
-
-## Build JAR
-
-Command:
-
-- `mvn clean package`
-
-The build artifact is created in:
-
-- `target/`
-
-The GitLab pipeline uses this artifact name:
-
-- `target/todolist-app-1.0.0.jar`
-
-## Run with Maven
-
-Command:
-
-- `mvn spring-boot:run`
-
-Application URL:
-
-- `http://localhost:8080`
-
-## Run built JAR
-
-Command:
-
-- `java -jar target/todolist-app-1.0.0.jar`
-
-Application URL:
-
-- `http://localhost:8080`
-
-## Stop application
-
-Use `Ctrl + C` in the terminal where the application is running.
-
-## Local verification checklist
-
-Local verification checks:
-
-- `java -version` shows Java 17;
-- `mvn clean verify` completes successfully;
-- `mvn clean package` creates the JAR file in `target/`;
-- `data/` exists in the project root;
-- the application starts on port `8080`.
+The `data/` directory must exist in the project root. It is included through `data/.gitkeep`.
