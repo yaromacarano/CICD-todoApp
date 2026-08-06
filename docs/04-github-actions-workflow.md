@@ -16,13 +16,12 @@ Checkout → Java 21 → Maven build, tests and Checkstyle → SonarQube Cloud
 
 ## Triggers
 
-The workflow supports three events:
+The workflow supports two events:
 
 | Event | `build-test-scan` | `deploy` |
 | --- | --- | --- |
 | Push to `github-actions` | Runs | Runs |
 | Pull request to `github-actions` | Runs | Skipped |
-| `workflow_dispatch` on `github-actions` | Runs | Runs |
 
 The deployment condition is:
 
@@ -30,7 +29,7 @@ The deployment condition is:
 if: github.ref == 'refs/heads/github-actions' && github.event_name != 'pull_request'
 ```
 
-This prevents pull requests from changing AWS resources. It also means that a manual run deploys when `github-actions` is selected.
+This prevents pull requests from changing AWS resources. As a result, only pushes to the `github-actions` branch perform deployment.
 
 ## Permissions and environment
 

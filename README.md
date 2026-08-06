@@ -136,7 +136,7 @@ terraform plan
 terraform apply
 ```
 
-Terraform is run separately from the application workflow. After the first `apply`, configure the required GitHub Secrets and Variables, then start the workflow manually from the Actions page. Later application changes deploy automatically on push.
+Terraform is run separately from the application workflow. After the first `apply`, configure the required GitHub Secrets and Variables, then trigger the first deployment with a push to the `github-actions` branch. Later application changes deploy automatically on every push.
 
 See [Terraform Infrastructure](docs/07-terraform.md) for the complete setup and first-deployment sequence.
 
@@ -152,19 +152,19 @@ Required secrets:
 
 |Secret|Purpose|
 |-|-|
-|`SONAR\_TOKEN`|Authenticates the Maven scanner with SonarQube Cloud|
-|`AWS\_ACCESS\_KEY\_ID`|Authenticates the deployment job with AWS|
-|`AWS\_SECRET\_ACCESS\_KEY`|Authenticates the deployment job with AWS|
+|`SONAR_TOKEN`|Authenticates the Maven scanner with SonarQube Cloud|
+|`AWS_ACCESS_KEY_ID`|Authenticates the deployment job with AWS|
+|`AWS_SECRET_ACCESS_KEY`|Authenticates the deployment job with AWS|
 
 Required variables:
 
 |Variable|Current project value|
 |-|-|
-|`SONAR\_ORGANIZATION`|SonarQube Cloud organization key|
-|`SONAR\_PROJECT\_KEY`|SonarQube Cloud project key|
-|`AWS\_REGION`|`us-east-1`|
-|`ECR\_REPOSITORY`|`todo-app`|
-|`CONTAINER\_NAME`|`todo`|
+|`SONAR_ORGANIZATION`|SonarQube Cloud organization key|
+|`SONAR_PROJECT_KEY`|SonarQube Cloud project key|
+|`AWS_REGION`|`us-east-1`|
+|`ECR_REPOSITORY`|`todo-app`|
+|`CONTAINER_NAME`|`todo`|
 |`SERVICE`|`todo-ecs-service`|
 |`CLUSTER`|`newcluster`|
 
@@ -176,9 +176,16 @@ Required variables:
 |-|-|-|
 |Push to `github-actions`|Yes|Yes|
 |Pull request to `github-actions`|Yes|No|
-|Manual run on `github-actions`|Yes|Yes|
 
-Terraform does not send an event to GitHub after `terraform apply`. For the first deployment, create the infrastructure and then start `Todo CI/CD WF` manually. Once the environment exists, normal pushes are enough.
+Terraform does not send an event to GitHub after `terraform apply`. For the first deployment, create the infrastructure and then push a commit to `github-actions`. If there are no file changes to commit, trigger the workflow with an empty commit:
+
+```bash
+git switch github-actions
+git commit --allow-empty -m "ci: trigger first deployment"
+git push origin github-actions
+```
+
+Once the environment exists, normal pushes are enough.
 
 ## Documentation
 

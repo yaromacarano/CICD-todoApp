@@ -143,13 +143,19 @@ Terraform and GitHub Actions do not start each other automatically. Use this ord
 
 1. Run `terraform apply` locally.
 2. Add the required GitHub Secrets and Variables.
-3. Open **GitHub → Actions → Todo CI/CD WF**.
-4. Select **Run workflow**.
-5. Select the `github-actions` branch and start the run.
-6. Wait for both jobs to succeed.
-7. Open the `application_url` returned by Terraform.
+3. Push a commit to the `github-actions` branch.
+4. Wait for both workflow jobs to succeed.
+5. Open the `application_url` returned by Terraform.
 
-The initial ECS task definition references `todo-app:latest`. If the new ECR repository is empty, ECS can show a stopped task before step 5. The first workflow run pushes a real image and updates the service to a new task definition revision.
+If there are no file changes to commit after creating the infrastructure, trigger the first deployment with an empty commit:
+
+```bash
+git switch github-actions
+git commit --allow-empty -m "ci: trigger first deployment"
+git push origin github-actions
+```
+
+The initial ECS task definition references `todo-app:latest`. If the new ECR repository is empty, ECS can show a stopped task before step 3. The first workflow run pushes a real image and updates the service to a new task definition revision.
 
 ## Later application deployments
 

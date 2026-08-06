@@ -131,8 +131,16 @@ For the first deployment:
 
 1. create the infrastructure with Terraform;
 2. configure the GitHub Secrets and Variables;
-3. run `Todo CI/CD WF` manually on `github-actions`;
+3. push a commit to the `github-actions` branch;
 4. wait for the ECS deployment to become stable.
+
+If there are no file changes to commit, use an empty commit to start the workflow:
+
+```bash
+git switch github-actions
+git commit --allow-empty -m "ci: trigger first deployment"
+git push origin github-actions
+```
 
 ## Cost considerations
 

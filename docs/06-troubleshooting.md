@@ -62,7 +62,6 @@ The application must be published with port mapping `8080:8080`:
 ```bash
 docker run --rm -p 8080:8080 todo-app:github-actions
 ```
-
 ## Workflow does not start
 
 Open `.github/workflows/deploy.yml` and confirm that it exists in the `github-actions` branch.
@@ -70,10 +69,16 @@ Open `.github/workflows/deploy.yml` and confirm that it exists in the `github-ac
 The current triggers are:
 
 - push to `github-actions`;
-- pull request to `github-actions`;
-- manual start through `workflow_dispatch`.
+- pull request to `github-actions`.
 
-If the **Run workflow** button is missing, select the workflow from the Actions page and confirm that the workflow file also exists on the repository default branch. Then select `github-actions` in the branch menu before starting it.
+If a push does not start the workflow:
+
+1. confirm that the commit was pushed to `origin/github-actions`;
+2. open the repository's **Actions** page and confirm that GitHub Actions is enabled;
+3. check the workflow file for YAML syntax errors;
+4. confirm that the pushed branch is named exactly `github-actions`.
+
+The **Run workflow** button is not used because the workflow file exists only in `github-actions` and not in the default `main` branch.
 
 ## SonarQube Cloud analysis fails
 
@@ -189,7 +194,7 @@ The event or stop reason usually identifies the problem more clearly than the Gi
 
 This can happen during the first Terraform run because the initial task definition uses the `latest` image before ECR contains an image.
 
-Run the GitHub Actions workflow manually on `github-actions`. The workflow pushes an image with the run number, registers a new task definition revision, and updates the service.
+Push a commit to the `github-actions` branch. The workflow pushes an image with the run number, registers a new task definition revision, and updates the service. If there are no file changes, use an empty commit with `git commit --allow-empty -m "ci: trigger first deployment"`.
 
 If the problem continues, confirm that:
 

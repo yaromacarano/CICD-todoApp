@@ -61,11 +61,19 @@ Application Load Balancer
 The first deployment requires two separate actions:
 
 1. Run Terraform locally to create the AWS resources.
-2. Start the GitHub Actions workflow manually from the `github-actions` branch.
+2. Push a commit to the `github-actions` branch to start the GitHub Actions workflow.
 
-Terraform does not automatically notify GitHub when `terraform apply` finishes. The manual workflow run builds the first application image, pushes it to the newly created ECR repository, and updates the ECS service.
+Terraform does not automatically notify GitHub when `terraform apply` finishes. If there are no file changes to commit after the infrastructure is created, trigger the first deployment with an empty commit:
 
-After the infrastructure exists, a normal push to `github-actions` starts the complete build and deployment flow.
+```bash
+git switch github-actions
+git commit --allow-empty -m "ci: trigger first deployment"
+git push origin github-actions
+```
+
+The workflow builds the first application image, pushes it to the newly created ECR repository, and updates the ECS service.
+
+After the infrastructure exists, every normal push to `github-actions` starts the complete build and deployment flow.
 
 ## Workflow behaviour
 
@@ -73,7 +81,6 @@ After the infrastructure exists, a normal push to `github-actions` starts the co
 | --- | --- |
 | Push to `github-actions` | Build, tests, analysis, image push, and ECS deployment |
 | Pull request to `github-actions` | Build, tests, and analysis without AWS deployment |
-| Manual workflow run | Complete flow when the selected branch is `github-actions` |
 
 The `deploy` job depends on the successful completion of `build-test-scan`. A failed build, test, Checkstyle execution, SonarQube Cloud analysis, or Quality Gate stops the workflow before deployment.
 

@@ -4,12 +4,12 @@ output "aws_account_id" {
 }
 
 output "ecr_repository_url" {
-  description = "URL of the ECR repository used by Jenkins."
+  description = "URL of the ECR repository."
   value       = aws_ecr_repository.todo.repository_url
 }
 
 output "ecs_cluster_name" {
-  description = "Name of the ECS cluster used by the Jenkins pipeline."
+  description = "Name of the ECS cluster."
   value       = aws_ecs_cluster.todo.name
 }
 
