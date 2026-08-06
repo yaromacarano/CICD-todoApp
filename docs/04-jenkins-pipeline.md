@@ -72,7 +72,7 @@ Create a permanent Jenkins node with:
 - **Launch method:** `Launch agents via SSH`;
 - **Host:** Jenkins Agent private IP;
 - **Credentials:** SSH username `jenkins` with the EC2 private key;
-- **Host Key Verification Strategy:** `Known hosts file Verification Strategy`.
+- **Host Key Verification Strategy:** `Manually trusted key Verification Strategy`.
 
 The Jenkins Controller must contain the Agent host key in:
 
