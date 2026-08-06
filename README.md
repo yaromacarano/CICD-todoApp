@@ -63,7 +63,6 @@ Mark `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `SONAR_TOKEN` as **Masked*
 - [`05-aws-ecr-ecs.md`](docs/05-aws-ecr-ecs.md) — AWS resources and deployment
 - [`06-troubleshooting.md`](docs/06-troubleshooting.md) — common errors
 - [`07-terraform-ansible.md`](docs/07-terraform-ansible.md) — complete setup
-- [`08-screenshots.md`](docs/08-screenshots.md) — required screenshots
 
 ## Cleanup
 
